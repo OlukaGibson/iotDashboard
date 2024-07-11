@@ -1,9 +1,12 @@
-from flask import Blueprint, redirect, url_for, render_template, request
-
+from flask import Blueprint, redirect, url_for, render_template, request, send_file
+import os
 from .extentions import db
-from .models import Devices, MetadataValues
+from .models import Devices, MetadataValues, Firmware
+from google.cloud import storage
+import io
 
 device_management = Blueprint('device_management', __name__)
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "C:/Users/gibson/Documents/flaskwork/iotDashboard/deviceManagement/connector.json"
 
 @device_management.route('/')
 def device_storage():
@@ -63,3 +66,40 @@ def update_device_data(id):
         return {'message': 'Device data updated successfully!'}
     
     return {'message': 'Invalid API key!'}, 403
+
+@device_management.route('/firmwareupload', methods=['POST'])
+def firmware_upload():
+    # Retrieve the file from the request
+    file = request.files['file']
+    firmwareVersion = request.form['firmwareVersion']
+    
+    storage_client = storage.Client()
+
+    bucket = storage_client.bucket('aqdevicedata')
+
+    # Create a new blob object
+    blob = bucket.blob(f'{firmwareVersion}.hex')
+    blob.upload_from_file(file)
+    db.session.add(Firmware(firmwareVersion))
+    db.session.commit()
+
+    return {'message': 'Firmware uploaded successfully!'}
+
+@device_management.route('/firmware/<string:firmwareVersion>/download', methods=['GET'])
+def firmware_download(firmwareVersion):
+    storage_client = storage.Client()
+    bucket = storage_client.bucket('aqdevicedata')
+    blob = bucket.blob(f'{firmwareVersion}.hex')
+    
+    # Download the blob into a bytes buffer
+    file_data = blob.download_as_string()
+    file_buffer = io.BytesIO(file_data)
+    file_buffer.seek(0)
+
+    return send_file(
+        file_buffer,
+        as_attachment=True,
+        download_name=f'{firmwareVersion}.hex',
+        mimetype='application/octet-stream'
+    )
+

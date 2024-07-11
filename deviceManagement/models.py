@@ -1,11 +1,22 @@
 from .extentions import db
 
+class Firmware(db.Model):
+    __tablename__ = 'firmware'
+    id = db.Column(db.Integer, primary_key=True)
+    firmwareVersion = db.Column(db.String(100), unique=True)
+    descrption = db.Column(db.String(250), default=None)
+
+    def __init__(self, firmwareVersion):
+        self.firmwareVersion = firmwareVersion
+
 class Devices(db.Model):
     __tablename__ = 'devices'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    readkey = db.Column(db.String(100))
-    writekey = db.Column(db.String(100))
+    name = db.Column(db.String(100), unique=True)
+    readkey = db.Column(db.String(100), unique=True)
+    writekey = db.Column(db.String(100), unique=True)
+    deviceID = db.Column(db.Integer, unique=True)
+    firmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'))
     file_download_state = db.Column(db.String(100))
     field1 = db.Column(db.String(100), default=None)
     field2 = db.Column(db.String(100), default=None)
@@ -57,7 +68,7 @@ class Devices(db.Model):
 class MetadataValues(db.Model):
     __tablename__ = 'metadatavalues'
     id = db.Column(db.Integer, primary_key=True)
-    deviceID = db.Column(db.Integer, db.ForeignKey('devices.id'))
+    deviceID = db.Column(db.Integer, db.ForeignKey('devices.deviceID'))
     field1 = db.Column(db.String(100), default=None)
     field2 = db.Column(db.String(100), default=None)
     field3 = db.Column(db.String(100), default=None)
