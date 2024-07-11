@@ -1,12 +1,24 @@
-from flask import Blueprint, redirect, url_for, render_template, request, send_file
+from flask import Blueprint, redirect, url_for, render_template, request, send_file, jsonify
 import os
 from .extentions import db
 from .models import Devices, MetadataValues, Firmware
 from google.cloud import storage
 import io
+import json
+from google.oauth2 import service_account
+from dotenv import load_dotenv
+
+load_dotenv()
 
 device_management = Blueprint('device_management', __name__)
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "C:/Users/gibson/Documents/flaskwork/iotDashboard/deviceManagement/connector.json"
+
+# Load the JSON credentials from the environment variable
+google_credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+
+# Parse the JSON credentials
+credentials_dict = json.loads(google_credentials_json)
+credentials = service_account.Credentials.from_service_account_info(credentials_dict)
+
 
 @device_management.route('/')
 def device_storage():
@@ -73,7 +85,7 @@ def firmware_upload():
     file = request.files['file']
     firmwareVersion = request.form['firmwareVersion']
     
-    storage_client = storage.Client()
+    storage_client = storage.Client(credentials=credentials)
 
     bucket = storage_client.bucket('aqdevicedata')
 
@@ -87,7 +99,7 @@ def firmware_upload():
 
 @device_management.route('/firmware/<string:firmwareVersion>/download', methods=['GET'])
 def firmware_download(firmwareVersion):
-    storage_client = storage.Client()
+    storage_client = storage.Client(credentials=credentials)
     bucket = storage_client.bucket('aqdevicedata')
     blob = bucket.blob(f'{firmwareVersion}.hex')
     
