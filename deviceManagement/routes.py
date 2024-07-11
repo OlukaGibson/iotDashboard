@@ -15,7 +15,7 @@ device_management = Blueprint('device_management', __name__)
 # Load the JSON credentials from the environment variable
 google_credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 
-# Parse the JSON credentials
+# Parse the JSON credentials 
 credentials_dict = json.loads(google_credentials_json)
 credentials = service_account.Credentials.from_service_account_info(credentials_dict)
 
