@@ -87,7 +87,7 @@ def firmware_upload():
     
     storage_client = storage.Client(credentials=credentials)
 
-    bucket = storage_client.bucket('aqdevicedata')
+    bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
 
     # Create a new blob object
     blob = bucket.blob(f'{firmwareVersion}.hex')
@@ -100,7 +100,7 @@ def firmware_upload():
 @device_management.route('/firmware/<string:firmwareVersion>/download', methods=['GET'])
 def firmware_download(firmwareVersion):
     storage_client = storage.Client(credentials=credentials)
-    bucket = storage_client.bucket('aqdevicedata')
+    bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
     blob = bucket.blob(f'{firmwareVersion}.hex')
     
     # Download the blob into a bytes buffer

@@ -6,8 +6,9 @@ class Firmware(db.Model):
     firmwareVersion = db.Column(db.String(100), unique=True)
     descrption = db.Column(db.String(250), default=None)
 
-    def __init__(self, firmwareVersion):
+    def __init__(self, firmwareVersion, descrption):
         self.firmwareVersion = firmwareVersion
+        self.descrption = descrption
 
 class Devices(db.Model):
     __tablename__ = 'devices'
