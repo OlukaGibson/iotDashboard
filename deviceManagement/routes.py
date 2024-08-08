@@ -84,7 +84,7 @@ def firmware_upload():
     # Retrieve the file from the request
     file = request.files['file']
     firmwareVersion = request.form['firmwareVersion']
-    descrption = request.form['descrption']
+    description = request.form['description']
     
     storage_client = storage.Client(credentials=credentials)
 
@@ -93,7 +93,7 @@ def firmware_upload():
     # Create a new blob object
     blob = bucket.blob(f'{firmwareVersion}.hex')
     blob.upload_from_file(file)
-    db.session.add(Firmware(firmwareVersion, descrption))
+    db.session.add(Firmware(firmwareVersion, description))
     db.session.commit()
 
     return {'message': 'Firmware uploaded successfully!'}

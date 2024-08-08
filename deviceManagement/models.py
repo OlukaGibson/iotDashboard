@@ -4,11 +4,11 @@ class Firmware(db.Model):
     __tablename__ = 'firmware'
     id = db.Column(db.Integer, primary_key=True)
     firmwareVersion = db.Column(db.String(100), unique=True)
-    descrption = db.Column(db.String(250), default=None)
+    description = db.Column(db.String(100))
 
-    def __init__(self, firmwareVersion, descrption):
+    def __init__(self, firmwareVersion, description):
         self.firmwareVersion = firmwareVersion
-        self.descrption = descrption
+        self.description = description
 
 class Devices(db.Model):
     __tablename__ = 'devices'
