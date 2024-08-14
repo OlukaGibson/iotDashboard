@@ -37,7 +37,7 @@ def add_device():
         file_download_state = data.get('file_download_state')
         
         fields = {}
-        for i in range(1, 22):
+        for i in range(1, 21):
             fields[f'field{i}'] = data.get(f'field{i}', None)
         
         # Create a new device object
@@ -63,7 +63,7 @@ def update_device_data(id):
     if device and writekey == device.writekey:
         # Retrieve optional fields from the query parameters using a loop
         fields = {}
-        for i in range(1, 22):
+        for i in range(1, 21):
             fields[f'field{i}'] = request.args.get(f'field{i}', None)
 
         # Create a new entry in the MetadataValues table
