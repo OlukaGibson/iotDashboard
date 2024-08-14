@@ -22,6 +22,7 @@ credentials = service_account.Credentials.from_service_account_info(credentials_
 
 @device_management.route('/')
 def device_storage():
+    print('Device storage is full!')
     return {'message': 'Device storage is full!'}
 
 @device_management.route('/device', methods=['GET', 'POST'])
