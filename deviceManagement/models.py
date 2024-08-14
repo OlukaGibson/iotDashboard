@@ -15,10 +15,10 @@ class Devices(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True)
     readkey = db.Column(db.String(100), unique=True)
-    writekey = db.Column(db.String(100), unique=True)
     deviceID = db.Column(db.Integer, unique=True)
-    firmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'))
-    file_download_state = db.Column(db.String(100))
+    writekey = db.Column(db.String(100), unique=True)
+    # firmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'))
+    # file_download_state = db.Column(db.String(100))
     field1 = db.Column(db.String(100), default=None)
     field2 = db.Column(db.String(100), default=None)
     field3 = db.Column(db.String(100), default=None)
@@ -40,11 +40,11 @@ class Devices(db.Model):
     field19 = db.Column(db.String(100), default=None)
     field20 = db.Column(db.String(100), default=None)
 
-    def __init__(self, name, readkey, writekey, file_download_state, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, field16, field17, field18, field19, field20):
+    def __init__(self, name, readkey, writekey, deviceID, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, field16, field17, field18, field19, field20):
         self.name = name
         self.readkey = readkey
         self.writekey = writekey
-        self.file_download_state = file_download_state
+        self.deviceID = deviceID
         self.field1 = field1
         self.field2 = field2
         self.field3 = field3

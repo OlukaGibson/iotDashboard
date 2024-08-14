@@ -34,14 +34,14 @@ def add_device():
         name = data.get('name')
         readkey = data.get('readkey')
         writekey = data.get('writekey')
-        file_download_state = data.get('file_download_state')
+        deviceID = data.get('deviceID')
         
         fields = {}
         for i in range(1, 21):
             fields[f'field{i}'] = data.get(f'field{i}', None)
         
         # Create a new device object
-        new_device = Devices(name=name, readkey=readkey, writekey=writekey, file_download_state=file_download_state, **fields)
+        new_device = Devices(name=name, readkey=readkey, writekey=writekey, deviceID=deviceID, **fields)
 
         # Add the new device to the database and commit the transaction
         db.session.add(new_device)
@@ -51,10 +51,11 @@ def add_device():
     
     return {'message': 'Use POST method to add a new device!'}
 
-@device_management.route('/device/<int:id>/update', methods=['GET'])
-def update_device_data(id):
+@device_management.route('/device/<int:deviceID>/update', methods=['GET'])
+def update_device_data(deviceID):
     # Retrieve the device from the database
-    device = db.session.get(Devices, id)
+    device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+    print('device is ', device)
     
     # Retrieve the api_key from the query parameters
     writekey = request.args.get('api_key')
@@ -68,7 +69,7 @@ def update_device_data(id):
 
         # Create a new entry in the MetadataValues table
         new_entry = MetadataValues(
-            deviceID=device.id,
+            deviceID=device.deviceID,
             **fields
         )
 
