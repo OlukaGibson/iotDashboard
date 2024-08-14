@@ -6,6 +6,7 @@
 #### flask db migrate -m "Initial migration."
 #### flask db upgrade
 #### flask run
+#### flask run --host=0.0.0.0 //development server 
 
 #### git add .
 #### git commit -m ""
