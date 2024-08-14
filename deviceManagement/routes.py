@@ -97,6 +97,8 @@ def firmware_upload():
     db.session.add(Firmware(firmwareVersion, description))
     db.session.commit()
 
+    print('firmwareVersion is ', firmwareVersion)
+
     return {'message': 'Firmware uploaded successfully!'}
 
 @device_management.route('/firmware/<string:firmwareVersion>/download', methods=['GET'])
@@ -109,6 +111,8 @@ def firmware_download(firmwareVersion):
     file_data = blob.download_as_string()
     file_buffer = io.BytesIO(file_data)
     file_buffer.seek(0)
+
+    print('firmwareVersion is ', firmwareVersion)
 
     return send_file(
         file_buffer,

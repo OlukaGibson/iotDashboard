@@ -39,9 +39,8 @@ class Devices(db.Model):
     field18 = db.Column(db.String(100), default=None)
     field19 = db.Column(db.String(100), default=None)
     field20 = db.Column(db.String(100), default=None)
-    field21 = db.Column(db.String(100), default=None)
 
-    def __init__(self, name, readkey, writekey, file_download_state, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, field16, field17, field18, field19, field20, field21):
+    def __init__(self, name, readkey, writekey, file_download_state, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, field16, field17, field18, field19, field20):
         self.name = name
         self.readkey = readkey
         self.writekey = writekey
@@ -66,7 +65,6 @@ class Devices(db.Model):
         self.field18 = field18
         self.field19 = field19
         self.field20 = field20
-        self.field21 = field21
 
 class MetadataValues(db.Model):
     __tablename__ = 'metadatavalues'
@@ -92,10 +90,8 @@ class MetadataValues(db.Model):
     field18 = db.Column(db.String(100), default=None)
     field19 = db.Column(db.String(100), default=None)
     field20 = db.Column(db.String(100), default=None)
-    field21 = db.Column(db.String(100), default=None)
 
-
-    def __init__(self, deviceID, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, field16, field17, field18, field19, field20, field21):
+    def __init__(self, deviceID, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, field16, field17, field18, field19, field20):
         self.deviceID = deviceID
         self.field1 = field1
         self.field2 = field2
@@ -117,4 +113,3 @@ class MetadataValues(db.Model):
         self.field18 = field18
         self.field19 = field19
         self.field20 = field20
-        self.field21 = field21
