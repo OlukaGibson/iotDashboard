@@ -42,14 +42,14 @@ def add_device():
         deviceID = data.get('deviceID')
         currentFirmwareVersion = data.get('currentFirmwareVersion', None)
         updateFirmwareVersion = data.get('updateFirmwareVersion', None)
-        file_download_state = data.get('file_download_state', None)
+        fileDownloadState = data.get('fileDownloadState', None)
         
         fields = {}
         for i in range(1, 21):
             fields[f'field{i}'] = data.get(f'field{i}', None)
         
         # Create a new device object
-        new_device = Devices(name=name, readkey=readkey, writekey=writekey, deviceID=deviceID, currentFirmwareVersion=currentFirmwareVersion, updateFirmwareVersion=updateFirmwareVersion, file_download_state=file_download_state, **fields)
+        new_device = Devices(name=name, readkey=readkey, writekey=writekey, deviceID=deviceID, currentFirmwareVersion=currentFirmwareVersion, updateFirmwareVersion=updateFirmwareVersion, fileDownloadState=fileDownloadState, **fields)
 
         # Add the new device to the database and commit the transaction
         db.session.add(new_device)
@@ -72,7 +72,7 @@ def get_devices():
             'deviceID': device.deviceID,
             'currentFirmwareVersion': device.currentFirmwareVersion,
             'updateFirmwareVersion': device.updateFirmwareVersion,
-            'file_download_state': device.file_download_state,
+            'fileDownloadState': device.fileDownloadState,
             'fields': {}
         }
         for i in range(1, 21):
@@ -94,7 +94,7 @@ def get_device(deviceID):
             'deviceID': device.deviceID,
             'currentFirmwareVersion': device.currentFirmwareVersion,
             'updateFirmwareVersion': device.updateFirmwareVersion,
-            'file_download_state': device.file_download_state,
+            'fileDownloadState': device.fileDownloadState,
             'fields': {}
         }
         for i in range(1, 21):
@@ -223,7 +223,8 @@ def get_firmware():
     for version in firmware:
         firmware_list.append({
             'firmwareVersion': version.firmwareVersion,
-            'description': version.description
+            'description': version.description,
+            'created_at': version.created_at
         })
     
     return jsonify(firmware_list)

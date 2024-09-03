@@ -20,7 +20,7 @@ class Devices(db.Model):
     writekey = db.Column(db.String(100), unique=True)
     currentFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
     previousFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
-    file_download_state = db.Column(db.String(100), default=None)
+    fileDownloadState = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     field1 = db.Column(db.String(100), default=None)
     field2 = db.Column(db.String(100), default=None)
@@ -43,14 +43,14 @@ class Devices(db.Model):
     field19 = db.Column(db.String(100), default=None)
     field20 = db.Column(db.String(100), default=None)
 
-    def __init__(self, name, readkey, writekey, deviceID, currentFirmwareVersion, updateFirmwareVersion, file_download_state ,field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, field16, field17, field18, field19, field20):
+    def __init__(self, name, readkey, writekey, deviceID, currentFirmwareVersion, updateFirmwareVersion, fileDownloadState ,field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, field16, field17, field18, field19, field20):
         self.name = name
         self.readkey = readkey
         self.writekey = writekey
         self.deviceID = deviceID
         self.currentFirmwareVersion = currentFirmwareVersion
         self.updateFirmwareVersion = updateFirmwareVersion
-        self.file_download_state = file_download_state
+        self.fileDownloadState = fileDownloadState
         self.field1 = field1
         self.field2 = field2
         self.field3 = field3
