@@ -19,12 +19,17 @@ google_credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 credentials_dict = json.loads(google_credentials_json)
 credentials = service_account.Credentials.from_service_account_info(credentials_dict)
 
-
+# Define a route for landing page
 @device_management.route('/')
 def device_storage():
     print('Device storage is full!')
     return {'message': 'Device storage is full!'}
 
+
+"""
+Device related routes for device management
+"""
+# Define a route to add a new device
 @device_management.route('/device', methods=['GET', 'POST'])
 def add_device():
     if request.method == 'POST':
@@ -35,13 +40,16 @@ def add_device():
         readkey = data.get('readkey')
         writekey = data.get('writekey')
         deviceID = data.get('deviceID')
+        currentFirmwareVersion = data.get('currentFirmwareVersion', None)
+        updateFirmwareVersion = data.get('updateFirmwareVersion', None)
+        file_download_state = data.get('file_download_state', None)
         
         fields = {}
         for i in range(1, 21):
             fields[f'field{i}'] = data.get(f'field{i}', None)
         
         # Create a new device object
-        new_device = Devices(name=name, readkey=readkey, writekey=writekey, deviceID=deviceID, **fields)
+        new_device = Devices(name=name, readkey=readkey, writekey=writekey, deviceID=deviceID, currentFirmwareVersion=currentFirmwareVersion, updateFirmwareVersion=updateFirmwareVersion, file_download_state=file_download_state, **fields)
 
         # Add the new device to the database and commit the transaction
         db.session.add(new_device)
@@ -51,6 +59,56 @@ def add_device():
     
     return {'message': 'Use POST method to add a new device!'}
 
+# Define a route to retrieve all devices
+@device_management.route('/devices', methods=['GET'])
+def get_devices():
+    devices = db.session.query(Devices).all()
+    devices_list = []
+    for device in devices:
+        device_dict = {
+            'name': device.name,
+            'readkey': device.readkey,
+            'writekey': device.writekey,
+            'deviceID': device.deviceID,
+            'currentFirmwareVersion': device.currentFirmwareVersion,
+            'updateFirmwareVersion': device.updateFirmwareVersion,
+            'file_download_state': device.file_download_state,
+            'fields': {}
+        }
+        for i in range(1, 21):
+            device_dict['fields'][f'field{i}'] = getattr(device, f'field{i}')
+        
+        devices_list.append(device_dict)
+    
+    return jsonify(devices_list)
+
+# Define a route to retrieve a specific device
+@device_management.route('/device/<int:deviceID>', methods=['GET'])
+def get_device(deviceID):
+    device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+    if device:
+        device_dict = {
+            'name': device.name,
+            'readkey': device.readkey,
+            'writekey': device.writekey,
+            'deviceID': device.deviceID,
+            'currentFirmwareVersion': device.currentFirmwareVersion,
+            'updateFirmwareVersion': device.updateFirmwareVersion,
+            'file_download_state': device.file_download_state,
+            'fields': {}
+        }
+        for i in range(1, 21):
+            device_dict['fields'][f'field{i}'] = getattr(device, f'field{i}')
+        
+        return jsonify(device_dict)
+    
+    return {'message': 'Device not found!'}, 404
+
+
+"""
+Data related routes for data management
+"""
+# Define a route to update device data
 @device_management.route('/device/<int:deviceID>/update', methods=['GET'])
 def update_device_data(deviceID):
     # Retrieve the device from the database
@@ -81,6 +139,40 @@ def update_device_data(deviceID):
     
     return {'message': 'Invalid API key!'}, 403
 
+# Define a route to retrieve device data
+@device_management.route('/device/<int:deviceID>/data', methods=['GET'])
+def get_device_data(deviceID):
+    # Retrieve the device from the database
+    device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+    
+    # Retrieve the api_key from the query parameters
+    readkey = request.args.get('api_key')
+    
+    # Check if the device exists and the provided readkey matches the device's readkey
+    if device and readkey == device.readkey:
+        # Retrieve all entries from the MetadataValues table for the device
+        entries = db.session.query(MetadataValues).filter_by(deviceID=deviceID).all()
+        entries_list = []
+        for entry in entries:
+            entry_dict = {
+                'deviceID': entry.deviceID,
+                'fields': {}
+            }
+            for i in range(1, 21):
+                entry_dict['fields'][f'field{i}'] = getattr(entry, f'field{i}')
+            
+            entries_list.append(entry_dict)
+        
+        return jsonify(entries_list)
+    
+    return {'message': 'Invalid API key!'}, 403
+
+
+
+"""
+Firmware management related routes for firmware management
+"""
+# Define a route to upload firmware
 @device_management.route('/firmwareupload', methods=['POST'])
 def firmware_upload():
     # Retrieve the file from the request
@@ -102,6 +194,7 @@ def firmware_upload():
 
     return {'message': 'Firmware uploaded successfully!'}
 
+# Define a route to download firmware
 @device_management.route('/firmware/<string:firmwareVersion>/download', methods=['GET'])
 def firmware_download(firmwareVersion):
     storage_client = storage.Client(credentials=credentials)
@@ -122,3 +215,15 @@ def firmware_download(firmwareVersion):
         mimetype='application/octet-stream'
     )
 
+# Define a route to retrieve all firmware versions
+@device_management.route('/firmware', methods=['GET'])
+def get_firmware():
+    firmware = db.session.query(Firmware).all()
+    firmware_list = []
+    for version in firmware:
+        firmware_list.append({
+            'firmwareVersion': version.firmwareVersion,
+            'description': version.description
+        })
+    
+    return jsonify(firmware_list)
