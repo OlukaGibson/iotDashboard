@@ -41,7 +41,7 @@ def add_device():
         writekey = data.get('writekey')
         deviceID = data.get('deviceID')
         currentFirmwareVersion = data.get('currentFirmwareVersion', None)
-        updateFirmwareVersion = data.get('updateFirmwareVersion', None)
+        previousFirmwareVersion = data.get('previousFirmwareVersion', None)
         fileDownloadState = data.get('fileDownloadState', None)
         
         fields = {}
@@ -49,7 +49,7 @@ def add_device():
             fields[f'field{i}'] = data.get(f'field{i}', None)
         
         # Create a new device object
-        new_device = Devices(name=name, readkey=readkey, writekey=writekey, deviceID=deviceID, currentFirmwareVersion=currentFirmwareVersion, updateFirmwareVersion=updateFirmwareVersion, fileDownloadState=fileDownloadState, **fields)
+        new_device = Devices(name=name, readkey=readkey, writekey=writekey, deviceID=deviceID, currentFirmwareVersion=currentFirmwareVersion, previousFirmwareVersion=previousFirmwareVersion, fileDownloadState=fileDownloadState, **fields)
 
         # Add the new device to the database and commit the transaction
         db.session.add(new_device)
@@ -71,7 +71,7 @@ def get_devices():
             'writekey': device.writekey,
             'deviceID': device.deviceID,
             'currentFirmwareVersion': device.currentFirmwareVersion,
-            'updateFirmwareVersion': device.updateFirmwareVersion,
+            'previousFirmwareVersion': device.previousFirmwareVersion,
             'fileDownloadState': device.fileDownloadState,
             'fields': {}
         }
@@ -93,7 +93,7 @@ def get_device(deviceID):
             'writekey': device.writekey,
             'deviceID': device.deviceID,
             'currentFirmwareVersion': device.currentFirmwareVersion,
-            'updateFirmwareVersion': device.updateFirmwareVersion,
+            'previousFirmwareVersion': device.previousFirmwareVersion,
             'fileDownloadState': device.fileDownloadState,
             'fields': {}
         }
