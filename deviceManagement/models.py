@@ -19,7 +19,7 @@ class Devices(db.Model):
     deviceID = db.Column(db.Integer, unique=True)
     writekey = db.Column(db.String(100), unique=True)
     currentFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
-    updateFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
+    previousFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
     file_download_state = db.Column(db.String(100), default=None)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     field1 = db.Column(db.String(100), default=None)
