@@ -2,6 +2,7 @@ import os
 from flask import Flask
 from .extentions import db, migrate
 from .routes import device_management
+from flask_cors import CORS
 
 def create_app():
     app = Flask(__name__)
@@ -11,6 +12,8 @@ def create_app():
 
     db.init_app(app)
     migrate.init_app(app, db)
+
+    CORS(app, origins=["http://localhost:3000"])
 
     app.register_blueprint(device_management)
 
