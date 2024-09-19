@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  flask_app:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - FLASK_APP=deviceManagement
+      - FLASK_ENV=development
+    command: gunicorn -w 4 -b 0.0.0.0:5000 run:app

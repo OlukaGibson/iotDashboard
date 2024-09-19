@@ -199,7 +199,7 @@ def firmware_upload():
 def firmware_download(firmwareVersion):
     storage_client = storage.Client(credentials=credentials)
     bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
-    blob = bucket.blob(f'{firmwareVersion}.hex')
+    blob = bucket.blob(f'{firmwareVersion}.bin')
     
     # Download the blob into a bytes buffer
     file_data = blob.download_as_string()
@@ -211,7 +211,7 @@ def firmware_download(firmwareVersion):
     return send_file(
         file_buffer,
         as_attachment=True,
-        download_name=f'{firmwareVersion}.hex',
+        download_name=f'{firmwareVersion}.bin',
         mimetype='application/octet-stream'
     )
 
