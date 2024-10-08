@@ -1,8 +1,8 @@
-"""more updates
+"""init
 
-Revision ID: 396104866df7
-Revises: 2ccce4ee6653
-Create Date: 2024-08-14 17:23:33.324172
+Revision ID: 8361ec680f2b
+Revises: 
+Create Date: 2024-10-02 10:20:21.065201
 
 """
 from alembic import op
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '396104866df7'
-down_revision = '2ccce4ee6653'
+revision = '8361ec680f2b'
+down_revision = None
 branch_labels = None
 depends_on = None
 
@@ -22,6 +22,7 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('firmwareVersion', sa.String(length=100), nullable=True),
     sa.Column('description', sa.String(length=100), nullable=True),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('firmwareVersion')
     )
@@ -29,10 +30,12 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=True),
     sa.Column('readkey', sa.String(length=100), nullable=True),
-    sa.Column('writekey', sa.String(length=100), nullable=True),
     sa.Column('deviceID', sa.Integer(), nullable=True),
-    sa.Column('firmwareVersion', sa.Integer(), nullable=True),
-    sa.Column('file_download_state', sa.String(length=100), nullable=True),
+    sa.Column('writekey', sa.String(length=100), nullable=True),
+    sa.Column('currentFirmwareVersion', sa.Integer(), nullable=True),
+    sa.Column('previousFirmwareVersion', sa.Integer(), nullable=True),
+    sa.Column('fileDownloadState', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
     sa.Column('field1', sa.String(length=100), nullable=True),
     sa.Column('field2', sa.String(length=100), nullable=True),
     sa.Column('field3', sa.String(length=100), nullable=True),
@@ -53,7 +56,8 @@ def upgrade():
     sa.Column('field18', sa.String(length=100), nullable=True),
     sa.Column('field19', sa.String(length=100), nullable=True),
     sa.Column('field20', sa.String(length=100), nullable=True),
-    sa.ForeignKeyConstraint(['firmwareVersion'], ['firmware.id'], ),
+    sa.ForeignKeyConstraint(['currentFirmwareVersion'], ['firmware.id'], ),
+    sa.ForeignKeyConstraint(['previousFirmwareVersion'], ['firmware.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('deviceID'),
     sa.UniqueConstraint('name'),
@@ -63,6 +67,7 @@ def upgrade():
     op.create_table('metadatavalues',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('deviceID', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
     sa.Column('field1', sa.String(length=100), nullable=True),
     sa.Column('field2', sa.String(length=100), nullable=True),
     sa.Column('field3', sa.String(length=100), nullable=True),
