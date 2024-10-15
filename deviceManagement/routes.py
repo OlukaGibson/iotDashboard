@@ -40,32 +40,39 @@ def firmware_upload():
     documentation = request.form.get('documentation', None)
     documentationLink = request.form.get('documentationLink', None)
     
+    # Read the file as a string (assuming it's a text-based hex file)
+    file_content = file.read().decode('utf-8')  # Decode the file to string
+
     changes = {}
     for i in range(1, 11):
         changes[f'change{i}'] = request.form.get(f'change{i}', None)
 
-    hex_file = IntelHex(file)
+    # Initialize IntelHex with the decoded string
+    hex_file = IntelHex(io.StringIO(file_content))  # Use StringIO for string input
     bin_data = io.BytesIO()
     hex_file.tobinfile(bin_data)
     bin_data.seek(0)
 
+    # Upload to Google Cloud Storage
     storage_client = storage.Client(credentials=credentials)
     bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
-
     blob = bucket.blob(f'{firmwareVersion}.bin')
     blob.upload_from_file(bin_data, content_type='application/octet-stream')
 
+    # Add firmware to database
     new_firmware = Firmware(
-        firmwareVersion, 
-        description,
-        documentation,
-        documentationLink,
+        firmwareVersion=firmwareVersion, 
+        description=description,
+        documentation=documentation,
+        documentationLink=documentationLink,
         **changes
-        )
+    )
     
     db.session.add(new_firmware)
     db.session.commit()
+    
     return {'message': 'Firmware uploaded successfully!'}
+
 
 # Define a route to download firmware
 @device_management.route('/firmware/<string:firmwareVersion>/download', methods=['GET'])
@@ -325,7 +332,7 @@ def get_device_data(deviceID):
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
     
     # Retrieve the api_key from the query parameters
-    readkey = request.args.get('api_key')
+    readkey = device.readkey
     
     # Check if the device exists and the provided readkey matches the device's readkey
     if device and readkey == device.readkey:
@@ -335,6 +342,7 @@ def get_device_data(deviceID):
         for entry in entries:
             entry_dict = {
                 'deviceID': entry.deviceID,
+                'created_at': entry.created_at,
                 'fields': {}
             }
             for i in range(1, 21):

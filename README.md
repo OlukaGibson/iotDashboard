@@ -11,3 +11,6 @@
 #### git add .
 #### git commit -m ""
 #### git push --set-upstream origin main
+
+#### docker-compose build
+#### docker-compose up

@@ -19,10 +19,10 @@ class Firmware(db.Model):
     change9 = db.Column(db.String(100), default=None)
     change10 = db.Column(db.String(100), default=None)
 
-    def __init__(self, firmwareVersion, description, documentaton, documentationLink, change1, change2, change3, change4, change5, change6, change7, change8, change9, change10):
+    def __init__(self, firmwareVersion, description, documentation, documentationLink, change1, change2, change3, change4, change5, change6, change7, change8, change9, change10):
         self.firmwareVersion = firmwareVersion
         self.description = description
-        self.documentaton = documentaton
+        self.documentation = documentation
         self.documentationLink = documentationLink
         self.change1 = change1
         self.change2 = change2
