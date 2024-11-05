@@ -8,6 +8,7 @@ import json
 from google.oauth2 import service_account
 from dotenv import load_dotenv
 from intelhex import IntelHex
+from datetime import datetime
 
 load_dotenv()
 
@@ -72,7 +73,6 @@ def firmware_upload():
     db.session.commit()
     
     return {'message': 'Firmware uploaded successfully!'}
-
 
 # Define a route to download firmware
 @device_management.route('/firmware/<string:firmwareVersion>/download', methods=['GET'])
@@ -293,7 +293,6 @@ Data related routes for data management
 # Define a route to update device data
 @device_management.route('/device/<int:deviceID>/update', methods=['GET'])
 def update_device_data(deviceID):
-    # Retrieve the device from the database
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
     # print('device is ', device)
     
@@ -318,8 +317,27 @@ def update_device_data(deviceID):
         db.session.commit()
 
         if device.fileDownloadState:
-            firmwareVersion = device.targetFirmwareVersion
-            firmware_download(firmwareVersion)
+            firmwareID = device.targetFirmwareVersion
+            firmware = db.session.query(Firmware).filter_by(id=firmwareID).first()
+            firmwareVersion = firmware.firmwareVersion
+            # firmwareVersion
+            storage_client = storage.Client(credentials=credentials)
+            bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
+            blob = bucket.blob(f'{firmwareVersion}.bin')
+    
+            file_data = blob.download_as_string()
+            file_buffer = io.BytesIO(file_data)
+            file_buffer.seek(0)
+
+            device.fileDownloadState = False
+            db.session.commit()
+
+            return send_file(
+                file_buffer,
+                as_attachment=True,
+                download_name=f'{firmwareVersion}.bin',
+                mimetype='application/octet-stream'
+            )
 
         return {'message': 'Device data updated successfully!'}
     
@@ -354,3 +372,82 @@ def get_device_data(deviceID):
     
     return {'message': 'Invalid API key!'}, 403
 
+
+"""
+File management related routes for file management
+"""
+# Define a route to upload a file
+@device_management.route('/device/<int:deviceID>/fileupload', methods=['POST'])
+def file_upload(deviceID):
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'error': 'No file part in the request'}), 400
+    
+    device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+    writekey = request.args.get('api_key')
+
+    # if not device or writekey != device.writekey:
+    #     return jsonify({'error': 'Unauthorized access'}), 403
+
+    try:
+        storage_client = storage.Client(credentials=credentials)
+        bucket_name = os.getenv('BUCKET_NAME')
+        if not bucket_name:
+            raise ValueError("Bucket name not set in environment variables")
+
+        bucket = storage_client.bucket(bucket_name)
+        
+        # Get current date and time for the file path
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        blob_path = f'data/{deviceID}/{current_date}/{current_time}.csv'
+        blob = bucket.blob(blob_path)
+        
+        blob.upload_from_file(file, content_type='text/csv')
+        
+        return jsonify({'message': 'File uploaded successfully!', 'file_path': blob_path}), 200
+
+    except Exception as e:
+        # Log the error or print it to the console
+        print(f"File upload failed: {e}")
+        return jsonify({'error': 'File upload failed', 'details': str(e)}), 500
+    
+# def firmware_upload():
+#     file = request.files['file']
+#     firmwareVersion = request.form['firmwareVersion']
+#     description = request.form['description']
+#     documentation = request.form.get('documentation', None)
+#     documentationLink = request.form.get('documentationLink', None)
+    
+#     # Read the file as a string (assuming it's a text-based hex file)
+#     file_content = file.read().decode('utf-8')  # Decode the file to string
+
+#     changes = {}
+#     for i in range(1, 11):
+#         changes[f'change{i}'] = request.form.get(f'change{i}', None)
+
+#     # Initialize IntelHex with the decoded string
+#     hex_file = IntelHex(io.StringIO(file_content))  # Use StringIO for string input
+#     bin_data = io.BytesIO()
+#     hex_file.tobinfile(bin_data)
+#     bin_data.seek(0)
+
+#     # Upload to Google Cloud Storage
+#     storage_client = storage.Client(credentials=credentials)
+#     bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
+#     blob = bucket.blob(f'{firmwareVersion}.bin')
+#     blob.upload_from_file(bin_data, content_type='application/octet-stream')
+
+#     # Add firmware to database
+#     new_firmware = Firmware(
+#         firmwareVersion=firmwareVersion, 
+#         description=description,
+#         documentation=documentation,
+#         documentationLink=documentationLink,
+#         **changes
+#     )
+    
+#     db.session.add(new_firmware)
+#     db.session.commit()
+    
+#     return {'message': 'Firmware uploaded successfully!'}
