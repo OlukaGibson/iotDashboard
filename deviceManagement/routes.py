@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from intelhex import IntelHex
 from datetime import datetime
 
+
 load_dotenv()
 
 device_management = Blueprint('device_management', __name__)
