@@ -49,17 +49,25 @@ def firmware_upload():
     for i in range(1, 11):
         changes[f'change{i}'] = request.form.get(f'change{i}', None)
 
-    # Initialize IntelHex with the decoded string
-    hex_file = IntelHex(io.StringIO(file_content))  # Use StringIO for string input
-    bin_data = io.BytesIO()
-    hex_file.tobinfile(bin_data)
-    bin_data.seek(0)
+    # Check if the file is a .hex file
+    if file.filename.endswith('.hex'):
+        # Initialize IntelHex with the decoded string
+        hex_file = IntelHex(io.StringIO(file_content))  # Use StringIO for string input
+        bin_data = io.BytesIO()
+        hex_file.tobinfile(bin_data)
+        bin_data.seek(0)
 
-    # Upload to Google Cloud Storage
-    storage_client = storage.Client(credentials=credentials)
-    bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
-    blob = bucket.blob(f'{firmwareVersion}.bin')
-    blob.upload_from_file(bin_data, content_type='application/octet-stream')
+        # Upload to Google Cloud Storage
+        storage_client = storage.Client(credentials=credentials)
+        bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
+        blob = bucket.blob(f'{firmwareVersion}.bin')
+        blob.upload_from_file(bin_data, content_type='application/octet-stream')
+    else:
+        # If not a .hex file, upload the original file
+        storage_client = storage.Client(credentials=credentials)
+        bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
+        blob = bucket.blob(f'{firmwareVersion}{os.path.splitext(file.filename)[1]}')
+        blob.upload_from_file(file, content_type=file.content_type)
 
     # Add firmware to database
     new_firmware = Firmware(
@@ -134,16 +142,6 @@ def get_firmware(firmwareVersion):
             'documentationLink': firmware.documentationLink,
             'created_at': firmware.created_at,
             'changes': {
-                # 'change1': firmware.change1,
-                # 'change2': firmware.change2,
-                # 'change3': firmware.change3,
-                # 'change4': firmware.change4,
-                # 'change5': firmware.change5,
-                # 'change6': firmware.change6,
-                # 'change7': firmware.change7,
-                # 'change8': firmware.change8,
-                # 'change9': firmware.change9,
-                # 'change10': firmware.change10
             }
         }
         for i in range(1, 11):
@@ -173,8 +171,10 @@ def add_device():
         
         # Extract dynamic fields from form data (field1 to field20)
         fields = {}
+        field_marks = {}
         for i in range(1, 21):
             fields[f'field{i}'] = request.form.get(f'field{i}', None)
+            field_marks[f'field{i}_mark'] = request.form.get(f'field{i}_mark', False)
         
         # Create a new device object
         new_device = Devices(
@@ -186,7 +186,8 @@ def add_device():
             previousFirmwareVersion=previousFirmwareVersion,
             targetFirmwareVersion=targetFirmwareVersion,
             fileDownloadState=fileDownloadState,
-            **fields
+            **fields,
+            **field_marks
         )
 
         # Add the new device to the database and commit the transaction
@@ -214,10 +215,12 @@ def get_devices():
             'fileDownloadState': device.fileDownloadState,
             'targetFirmwareVersion': device.targetFirmwareVersion,
             'created_at': device.created_at,
-            'fields': {}
+            'fields': {},
+            'field_marks': {}
         }
         for i in range(1, 21):
             device_dict['fields'][f'field{i}'] = getattr(device, f'field{i}')
+            device_dict['field_marks'][f'field{i}_mark'] = getattr(device, f'field{i}_mark')
         
         devices_list.append(device_dict)
     
@@ -236,10 +239,12 @@ def get_device(deviceID):
             'currentFirmwareVersion': device.currentFirmwareVersion,
             'previousFirmwareVersion': device.previousFirmwareVersion,
             'fileDownloadState': device.fileDownloadState,
-            'fields': {}
+            'fields': {},
+            'field_marks': {}
         }
         for i in range(1, 21):
             device_dict['fields'][f'field{i}'] = getattr(device, f'field{i}')
+            device_dict['field_marks'][f'field{i}_mark'] = getattr(device, f'field{i}_mark')
         
         return jsonify(device_dict)
     
@@ -264,8 +269,10 @@ def edit_device(deviceID):
         fileDownloadState = request.form.get('fileDownloadState', device.fileDownloadState)
 
         fields = {}
+        field_marks = {}
         for i in range(1, 21):
             fields[f'field{i}'] = request.form.get(f'field{i}', getattr(device, f'field{i}'))
+            field_marks[f'field{i}_mark'] = request.form.get(f'field{i}_mark', getattr(device, f'field{i}_mark'))
 
         device.name = name
         device.readkey = readkey
@@ -275,9 +282,15 @@ def edit_device(deviceID):
         device.targetFirmwareVersion = targetFirmwareVersion
         device.fileDownloadState = fileDownloadState
 
-        # Update dynamic fields
-        for field, value in fields.items():
-            setattr(device, field, value)
+        # Update fields
+        # for field, value in fields.items():
+        #     setattr(device, field, value)
+
+        # Update fields and field_marks
+        for i in range(1, 21):
+            setattr(device, f'field{i}', fields[f'field{i}'])
+            setattr(device, f'field{i}_mark', field_marks[f'field{i}_mark'])
+            
 
         # Commit the changes to the database
         db.session.commit()
