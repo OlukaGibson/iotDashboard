@@ -22,6 +22,11 @@ google_credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 credentials_dict = json.loads(google_credentials_json)
 credentials = service_account.Credentials.from_service_account_info(credentials_dict)
 
+
+def clean_data(data):
+    return None if data == "" else data
+
+
 # Define a route for landing page
 @device_management.route('/')
 def device_storage():
@@ -108,6 +113,7 @@ def get_firmwares():
     firmware_list = []
     for version in firmware:
         firmware_list.append({
+            'id': version.id,
             'firmwareVersion': version.firmwareVersion,
             'description': version.description,
             'documentation': version.documentation,
@@ -160,21 +166,21 @@ Device related routes for device management
 def add_device():
     if request.method == 'POST':
         # Extract fields from form data with default value None if not present
-        name = request.form.get('name')
-        readkey = request.form.get('readkey')
-        writekey = request.form.get('writekey')
-        deviceID = request.form.get('deviceID')
-        currentFirmwareVersion = request.form.get('currentFirmwareVersion', None)
-        previousFirmwareVersion = request.form.get('previousFirmwareVersion', None)
-        targetFirmwareVersion = request.form.get('targetFirmwareVersion', None)
-        fileDownloadState = request.form.get('fileDownloadState', False)
+        name = clean_data(request.form.get('name'))
+        readkey = clean_data(request.form.get('readkey'))
+        writekey = clean_data(request.form.get('writekey'))
+        deviceID = clean_data(request.form.get('deviceID'))
+        currentFirmwareVersion = clean_data(request.form.get('currentFirmwareVersion'))
+        previousFirmwareVersion = clean_data(request.form.get('previousFirmwareVersion'))
+        targetFirmwareVersion = clean_data(request.form.get('targetFirmwareVersion'))
+        fileDownloadState = request.form.get('fileDownloadState', 'False').lower() in ['true', '1', 't', 'y', 'yes']
         
-        # Extract dynamic fields from form data (field1 to field20)
+        # Extract dynamic fields and their marks from form data (field1 to field20)
         fields = {}
         field_marks = {}
         for i in range(1, 21):
-            fields[f'field{i}'] = request.form.get(f'field{i}', None)
-            field_marks[f'field{i}_mark'] = request.form.get(f'field{i}_mark', False)
+            fields[f'field{i}'] = clean_data(request.form.get(f'field{i}', None))
+            field_marks[f'field{i}_mark'] = clean_data(request.form.get(f'field{i}_mark', 'False').lower() in ['true', '1', 't', 'y', 'yes'])
         
         # Create a new device object
         new_device = Devices(
