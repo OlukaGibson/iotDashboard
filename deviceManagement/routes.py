@@ -1,7 +1,7 @@
 from flask import Blueprint, redirect, url_for, render_template, request, send_file, jsonify
 import os
 from .extentions import db
-from .models import Devices, MetadataValues, Firmware
+from .models import Devices, MetadataValues, Firmware, DeviceFiles
 from google.cloud import storage
 import io
 import json
@@ -481,8 +481,8 @@ def file_upload(deviceID):
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
     writekey = request.args.get('api_key')
 
-    # if not device or writekey != device.writekey:
-    #     return jsonify({'error': 'Unauthorized access'}), 403
+    if not device and writekey != device.writekey:
+        return jsonify({'error': 'Unauthorized access'}), 403
 
     try:
         storage_client = storage.Client(credentials=credentials)
@@ -499,50 +499,18 @@ def file_upload(deviceID):
         blob = bucket.blob(blob_path)
         
         blob.upload_from_file(file, content_type='text/csv')
-        
+
+        # Create a new entry in the DeviceFiles table
+        new_file = DeviceFiles(
+            deviceID=deviceID,
+            file=blob_path
+        )
+        db.session.add(new_file)
+        db.session.commit()
+
         return jsonify({'message': 'File uploaded successfully!', 'file_path': blob_path}), 200
 
     except Exception as e:
         # Log the error or print it to the console
         print(f"File upload failed: {e}")
         return jsonify({'error': 'File upload failed', 'details': str(e)}), 500
-    
-# def firmware_upload():
-#     file = request.files['file']
-#     firmwareVersion = request.form['firmwareVersion']
-#     description = request.form['description']
-#     documentation = request.form.get('documentation', None)
-#     documentationLink = request.form.get('documentationLink', None)
-    
-#     # Read the file as a string (assuming it's a text-based hex file)
-#     file_content = file.read().decode('utf-8')  # Decode the file to string
-
-#     changes = {}
-#     for i in range(1, 11):
-#         changes[f'change{i}'] = request.form.get(f'change{i}', None)
-
-#     # Initialize IntelHex with the decoded string
-#     hex_file = IntelHex(io.StringIO(file_content))  # Use StringIO for string input
-#     bin_data = io.BytesIO()
-#     hex_file.tobinfile(bin_data)
-#     bin_data.seek(0)
-
-#     # Upload to Google Cloud Storage
-#     storage_client = storage.Client(credentials=credentials)
-#     bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
-#     blob = bucket.blob(f'{firmwareVersion}.bin')
-#     blob.upload_from_file(bin_data, content_type='application/octet-stream')
-
-#     # Add firmware to database
-#     new_firmware = Firmware(
-#         firmwareVersion=firmwareVersion, 
-#         description=description,
-#         documentation=documentation,
-#         documentationLink=documentationLink,
-#         **changes
-#     )
-    
-#     db.session.add(new_firmware)
-#     db.session.commit()
-    
-#     return {'message': 'Firmware uploaded successfully!'}

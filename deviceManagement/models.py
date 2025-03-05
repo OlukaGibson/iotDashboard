@@ -194,3 +194,14 @@ class MetadataValues(db.Model):
         self.field18 = field18
         self.field19 = field19
         self.field20 = field20
+
+class DeviceFiles(db.Model):
+    __tablename__ = 'devicefiles'
+    id = db.Column(db.Integer, primary_key=True)
+    deviceID = db.Column(db.Integer, db.ForeignKey('devices.deviceID'))
+    file = db.Column(db.String(100), default=None, nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+    def __init__(self, deviceID, file):
+        self.deviceID = deviceID
+        self.file = file
