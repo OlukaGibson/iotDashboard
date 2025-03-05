@@ -41,100 +41,177 @@ Firmware management related routes for firmware management
 # Define a route to upload firmware
 @device_management.route('/firmwareupload', methods=['POST'])
 def firmware_upload():
-    file = request.files['file']
+    firmware = request.files.get('firmware')
+    firmware_bootloader = request.files.get('firmware_bootloader', None)
     firmwareVersion = request.form['firmwareVersion']
-    description = request.form['description']
-    documentation = request.form.get('documentation', None)
-    documentationLink = request.form.get('documentationLink', None)
-    
+    description = clean_data(request.form.get('description', None))
+
     # Read the file as a string (assuming it's a text-based hex file)
-    file_content = file.read().decode('utf-8')  # Decode the file to string
+    firmware_content = firmware.read().decode('utf-8')
+    firmware_bootloader_content = firmware_bootloader.read().decode('utf-8') if firmware_bootloader else None
 
     changes = {}
     for i in range(1, 11):
-        changes[f'change{i}'] = request.form.get(f'change{i}', None)
+        changes[f'change{i}'] = clean_data(request.form.get(f'change{i}', None))
 
-    # Check if the file is a .hex file
-    if file.filename.endswith('.hex'):
-        # Initialize IntelHex with the decoded string
-        hex_file = IntelHex(io.StringIO(file_content))  # Use StringIO for string input
+    # uploading firmware to google cloud storage
+    if firmware.filename.endswith('.hex'):
+        firmware_hex = IntelHex(io.StringIO(firmware_content))
         bin_data = io.BytesIO()
-        hex_file.tobinfile(bin_data)
+        firmware_hex.tobinfile(bin_data)
         bin_data.seek(0)
 
-        # Upload to Google Cloud Storage
         storage_client = storage.Client(credentials=credentials)
         bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
-        blob = bucket.blob(f'{firmwareVersion}.bin')
+
+        # bin file storage
+        blob = bucket.blob(f'firmware/firmware_file_bin/{firmwareVersion}.bin')
         blob.upload_from_file(bin_data, content_type='application/octet-stream')
+        firmware_string = f'firmware/firmware_file_bin/{firmwareVersion}.bin'
+
+        # hex file storage
+        blob_hex = bucket.blob(f'firmware/firmware_file_hex/{firmwareVersion}.hex')
+        blob_hex.upload_from_string(firmware_content, content_type='text/plain')
+        firmware_string_hex = f'firmware/firmware_file_hex/{firmwareVersion}.hex'
+
+        # bootloader file storage
+        if firmware_bootloader:
+            blob_bootloader = bucket.blob(f'firmware/firmware_file_bootloader/{firmwareVersion}_bootloader.hex')
+            blob_bootloader.upload_from_string(firmware_bootloader_content, content_type='text/plain')
+            firmware_string_bootloader = f'firmware/firmware_file_bootloader/{firmwareVersion}_bootloader.hex'
+        else:
+            firmware_string_bootloader = None
+
     else:
-        # If not a .hex file, upload the original file
         storage_client = storage.Client(credentials=credentials)
         bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
-        blob = bucket.blob(f'{firmwareVersion}{os.path.splitext(file.filename)[1]}')
-        blob.upload_from_file(file, content_type=file.content_type)
+        blob = bucket.blob(f'firmware/firmware_file/{firmwareVersion}{os.path.splitext(firmware.filename)[1]}')
+        blob.upload_from_file(firmware, content_type=firmware.content_type)
+        firmware_string = f'firmware/firmware_file/{firmwareVersion}{os.path.splitext(firmware.filename)[1]}'
+        firmware_string_hex = None
+        firmware_string_bootloader = None
 
     # Add firmware to database
     new_firmware = Firmware(
-        firmwareVersion=firmwareVersion, 
+        firmwareVersion=firmwareVersion,
+        firmware_string=firmware_string,
+        firmware_string_hex=firmware_string_hex,
+        firmware_string_bootloader=firmware_string_bootloader,
         description=description,
-        documentation=documentation,
-        documentationLink=documentationLink,
         **changes
     )
-    
+
     db.session.add(new_firmware)
     db.session.commit()
-    
+
     return {'message': 'Firmware uploaded successfully!'}
 
-# Define a route to download firmware
-@device_management.route('/firmware/<string:firmwareVersion>/download', methods=['GET'])
+# Define a route to download firmware bin file
+@device_management.route('/firmware/<string:firmwareVersion>/download/firwmwarebin', methods=['GET'])
 def firmware_download(firmwareVersion):
-    storage_client = storage.Client(credentials=credentials)
-    bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
-    blob = bucket.blob(f'{firmwareVersion}.bin')
+    firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
     
-    file_data = blob.download_as_string()
-    file_buffer = io.BytesIO(file_data)
-    file_buffer.seek(0)
+    if firmware:
+        firmware_string = firmware.firmware_string
+        if not firmware_string:
+            return {'message': 'Firmware bin file not found!'}, 404
+        
+        storage_client = storage.Client(credentials=credentials)
+        bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
+        blob = bucket.blob(firmware_string)
 
-    return send_file(
-        file_buffer,
-        as_attachment=True,
-        download_name=f'{firmwareVersion}.bin',
-        mimetype='application/octet-stream'
-    )
+        file_data = blob.download_as_string()
+        file_buffer = io.BytesIO(file_data)
+        file_buffer.seek(0)
+
+        return send_file(
+            file_buffer,
+            as_attachment=True,
+            download_name=f'{firmwareVersion}.bin',
+            mimetype='application/octet-stream'
+        )
+    
+    return {'message': 'Firmware version not found!'}, 404
+
+# Define a route to download firmware hex file
+@device_management.route('/firmware/<string:firmwareVersion>/download/firwmwarehex', methods=['GET'])
+def firmware_download_hex(firmwareVersion):
+    firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
+
+    if firmware:
+        firmware_string = firmware.firmware_string_hex
+        if not firmware_string:
+            return {'message': 'Firmware hex file not found!'}, 404
+        
+        storage_client = storage.Client(credentials=credentials)
+        bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
+        blob = bucket.blob(firmware_string)
+
+        file_data = blob.download_as_string()
+        file_buffer = io.BytesIO(file_data)
+        file_buffer.seek(0)
+
+        return send_file(
+            file_buffer,
+            as_attachment=True,
+            download_name=f'{firmwareVersion}.hex',
+            mimetype='text/plain'
+        )
+    
+    return {'message': 'Firmware version not found!'}, 404
+
+# Define a route to download firmware bootloader file
+@device_management.route('/firmware/<string:firmwareVersion>/download/firwmwarebootloader', methods=['GET'])
+def firmware_download_bootloader(firmwareVersion):
+    firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
+
+    if firmware:
+        firmware_string = firmware.firmware_string_bootloader
+        if not firmware_string:
+            return {'message': 'Firmware bootloader file not found!'}, 404
+        
+        storage_client = storage.Client(credentials=credentials)
+        bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
+        blob = bucket.blob(firmware_string)
+
+        file_data = blob.download_as_string()
+        file_buffer = io.BytesIO(file_data)
+        file_buffer.seek(0)
+
+        return send_file(
+            file_buffer,
+            as_attachment=True,
+            download_name=f'{firmwareVersion}_bootloader.hex',
+            mimetype='text/plain'
+        )
+    
+    return {'message': 'Firmware version not found!'}, 404
 
 # Define a route to retrieve all firmware versions
 @device_management.route('/firmware/display', methods=['GET'])
 def get_firmwares():
-    firmware = db.session.query(Firmware).all()
-    firmware_list = []
-    for version in firmware:
-        firmware_list.append({
+    firmwares = db.session.query(Firmware).all()
+    firmwares_list = []
+    for version in firmwares:
+        changes = {}
+        for i in range(1, 11):
+            change_value = getattr(version, f'change{i}')
+            if change_value is not None:
+                changes[f'change{i}'] = change_value
+
+        firmwares_list.append({
             'id': version.id,
             'firmwareVersion': version.firmwareVersion,
+            'firmware_string': version.firmware_string,
+            'firmware_string_hex': version.firmware_string_hex,
+            'firmware_string_bootloader': version.firmware_string_bootloader,
             'description': version.description,
-            'documentation': version.documentation,
-            'documentationLink': version.documentationLink,
             'created_at': version.created_at,
-            'changes': {
-                'change1': version.change1,
-                'change2': version.change2,
-                'change3': version.change3,
-                'change4': version.change4,
-                'change5': version.change5,
-                'change6': version.change6,
-                'change7': version.change7,
-                'change8': version.change8,
-                'change9': version.change9,
-                'change10': version.change10
-            },
-            'created_at': version.created_at
+            'changes': changes,
+            'updated_at': version.updated_at
         })
     
-    return jsonify(firmware_list)
+    return jsonify(firmwares_list)
 
 # Define a route to retrieve a specific firmware version
 @device_management.route('/firmware/<string:firmwareVersion>', methods=['GET'])
@@ -143,15 +220,17 @@ def get_firmware(firmwareVersion):
     if firmware:
         firmware_dict = {
             'firmwareVersion': firmware.firmwareVersion,
+            'firmware_string': firmware.firmware_string,
+            'firmware_string_hex': firmware.firmware_string_hex,
+            'firmware_string_bootloader': firmware.firmware_string_bootloader,
             'description': firmware.description,
-            'documentation': firmware.documentation,
-            'documentationLink': firmware.documentationLink,
             'created_at': firmware.created_at,
             'changes': {
             }
         }
         for i in range(1, 11):
-            firmware_dict['changes'][f'change{i}'] = getattr(firmware, f'change{i}')
+            if getattr(firmware, f'change{i}'):
+                firmware_dict['changes'][f'change{i}'] = getattr(firmware, f'change{i}')
         
         return jsonify(firmware_dict)
     
@@ -162,48 +241,44 @@ def get_firmware(firmwareVersion):
 Device related routes for device management
 """
 # Define a route to add a new device
-@device_management.route('/adddevice', methods=['GET', 'POST'])
+@device_management.route('/adddevice', methods=['POST'])
 def add_device():
-    if request.method == 'POST':
-        # Extract fields from form data with default value None if not present
-        name = clean_data(request.form.get('name'))
-        readkey = clean_data(request.form.get('readkey'))
-        writekey = clean_data(request.form.get('writekey'))
-        deviceID = clean_data(request.form.get('deviceID'))
-        currentFirmwareVersion = clean_data(request.form.get('currentFirmwareVersion'))
-        previousFirmwareVersion = clean_data(request.form.get('previousFirmwareVersion'))
-        targetFirmwareVersion = clean_data(request.form.get('targetFirmwareVersion'))
-        fileDownloadState = request.form.get('fileDownloadState', 'False').lower() in ['true', '1', 't', 'y', 'yes']
+    # Extract fields from form data with default value None if not present
+    name = clean_data(request.form.get('name'))
+    readkey = clean_data(request.form.get('readkey'))
+    writekey = clean_data(request.form.get('writekey'))
+    deviceID = clean_data(request.form.get('deviceID'))
+    currentFirmwareVersion = clean_data(request.form.get('currentFirmwareVersion'))
+    previousFirmwareVersion = clean_data(request.form.get('previousFirmwareVersion'))
+    targetFirmwareVersion = clean_data(request.form.get('targetFirmwareVersion'))
+    fileDownloadState = request.form.get('fileDownloadState', 'False').lower() in ['true', '1', 't', 'y', 'yes']
         
-        # Extract dynamic fields and their marks from form data (field1 to field20)
-        fields = {}
-        field_marks = {}
-        for i in range(1, 21):
-            fields[f'field{i}'] = clean_data(request.form.get(f'field{i}', None))
-            field_marks[f'field{i}_mark'] = clean_data(request.form.get(f'field{i}_mark', 'False').lower() in ['true', '1', 't', 'y', 'yes'])
-        
-        # Create a new device object
-        new_device = Devices(
-            name=name,
-            readkey=readkey,
-            writekey=writekey,
-            deviceID=deviceID,
-            currentFirmwareVersion=currentFirmwareVersion,
-            previousFirmwareVersion=previousFirmwareVersion,
-            targetFirmwareVersion=targetFirmwareVersion,
-            fileDownloadState=fileDownloadState,
-            **fields,
-            **field_marks
-        )
-
-        # Add the new device to the database and commit the transaction
-        db.session.add(new_device)
-        db.session.commit()
-
-        return {'message': 'New device added successfully!'}
+    # Extract dynamic fields and their marks from form data (field1 to field20)
+    fields = {}
+    field_marks = {}
+    for i in range(1, 21):
+        fields[f'field{i}'] = clean_data(request.form.get(f'field{i}', None))
+        field_marks[f'field{i}_mark'] = clean_data(request.form.get(f'field{i}_mark', 'False').lower() in ['true', '1', 't', 'y', 'yes'])
     
-    return {'message': 'Use POST method to add a new device!'}
+    # Create a new device object
+    new_device = Devices(
+        name=name,
+        readkey=readkey,
+        writekey=writekey,
+        deviceID=deviceID,
+        currentFirmwareVersion=currentFirmwareVersion,
+        previousFirmwareVersion=previousFirmwareVersion,
+        targetFirmwareVersion=targetFirmwareVersion,
+        fileDownloadState=fileDownloadState,
+        **fields,
+        **field_marks
+    )
 
+    # Add the new device to the database and commit the transaction
+    db.session.add(new_device)
+    db.session.commit()
+
+    return {'message': 'New device added successfully!'}
 
 # Define a route to retrieve all devices
 @device_management.route('/get_devices', methods=['GET'])
@@ -304,7 +379,6 @@ def edit_device(deviceID):
         return {'message': 'Device updated successfully!'}
 
     return {'message': 'Use POST method to update device data!'}
-
 
 
 """

@@ -4,10 +4,12 @@ class Firmware(db.Model):
     __tablename__ = 'firmware'
     id = db.Column(db.Integer, primary_key=True)
     firmwareVersion = db.Column(db.String(100), unique=True)
-    description = db.Column(db.String(100))
-    documentation = db.Column(db.String(100), default=None)
-    documentationLink = db.Column(db.String(100), default=None)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    firmware_string = db.Column(db.String(100), nullable=False)
+    firmware_string_hex = db.Column(db.String(100), default=None, nullable=True)
+    firmware_string_bootloader = db.Column(db.String(100), default=None, nullable=True)
+    description = db.Column(db.String(100), default=None, nullable=True)
+    # documentation = db.Column(db.String(100), default=None)
+    # documentationLink = db.Column(db.String(100), default=None)
     change1 = db.Column(db.String(100), default=None)
     change2 = db.Column(db.String(100), default=None)
     change3 = db.Column(db.String(100), default=None)
@@ -18,12 +20,18 @@ class Firmware(db.Model):
     change8 = db.Column(db.String(100), default=None)
     change9 = db.Column(db.String(100), default=None)
     change10 = db.Column(db.String(100), default=None)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), server_onupdate=db.func.now())    
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
 
-    def __init__(self, firmwareVersion, description, documentation, documentationLink, change1, change2, change3, change4, change5, change6, change7, change8, change9, change10):
+
+    def __init__(self, firmwareVersion,firmware_string, firmware_string_hex, firmware_string_bootloader, description, change1, change2, change3, change4, change5, change6, change7, change8, change9, change10):
         self.firmwareVersion = firmwareVersion
+        self.firmware_string = firmware_string
+        self.firmware_string_hex = firmware_string_hex
+        self.firmware_string_bootloader = firmware_string_bootloader
         self.description = description
-        self.documentation = documentation
-        self.documentationLink = documentationLink
+        # self.documentation = documentation
+        # self.documentationLink = documentationLink
         self.change1 = change1
         self.change2 = change2
         self.change3 = change3
