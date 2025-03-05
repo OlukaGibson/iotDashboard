@@ -43,7 +43,7 @@ Firmware management related routes for firmware management
 def firmware_upload():
     firmware = request.files.get('firmware')
     firmware_bootloader = request.files.get('firmware_bootloader', None)
-    firmwareVersion = request.form['firmwareVersion']
+    firmwareVersion = request.form.get('firmwareVersion')
     description = clean_data(request.form.get('description', None))
 
     # Read the file as a string (assuming it's a text-based hex file)
@@ -225,6 +225,7 @@ def get_firmware(firmwareVersion):
             'firmware_string_bootloader': firmware.firmware_string_bootloader,
             'description': firmware.description,
             'created_at': firmware.created_at,
+            'updated_at': firmware.updated_at,
             'changes': {
             }
         }
