@@ -288,6 +288,7 @@ def get_devices():
     devices_list = []
     for device in devices:
         device_dict = {
+            'id': device.id,
             'name': device.name,
             'readkey': device.readkey,
             'writekey': device.writekey,
@@ -301,8 +302,9 @@ def get_devices():
             'field_marks': {}
         }
         for i in range(1, 21):
-            device_dict['fields'][f'field{i}'] = getattr(device, f'field{i}')
-            device_dict['field_marks'][f'field{i}_mark'] = getattr(device, f'field{i}_mark')
+            if getattr(device, f'field{i}'):
+                device_dict['fields'][f'field{i}'] = getattr(device, f'field{i}')
+                device_dict['field_marks'][f'field{i}_mark'] = getattr(device, f'field{i}_mark')
         
         devices_list.append(device_dict)
     
@@ -312,8 +314,25 @@ def get_devices():
 @device_management.route('/get_device/<int:deviceID>', methods=['GET'])
 def get_device(deviceID):
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+    
     if device:
+         # first 100 records of device data
+        device_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
+        device_data_list = []
+        for data in device_data:
+            data_dict = {
+                'entryID': data.id,
+                'created_at': data.created_at,
+                'fields': {}
+            }
+            for i in range(1, 21):
+                if getattr(data, f'field{i}'):
+                    data_dict['fields'][f'field{i}'] = getattr(data, f'field{i}')
+
+            device_data_list.append(data_dict)
         device_dict = {
+            'id': device.id,
+            'created_at': device.created_at,
             'name': device.name,
             'readkey': device.readkey,
             'writekey': device.writekey,
@@ -322,11 +341,13 @@ def get_device(deviceID):
             'previousFirmwareVersion': device.previousFirmwareVersion,
             'fileDownloadState': device.fileDownloadState,
             'fields': {},
-            'field_marks': {}
+            'field_marks': {},
+            'device_data': device_data_list
         }
         for i in range(1, 21):
-            device_dict['fields'][f'field{i}'] = getattr(device, f'field{i}')
-            device_dict['field_marks'][f'field{i}_mark'] = getattr(device, f'field{i}_mark')
+            if getattr(device, f'field{i}'):
+                device_dict['fields'][f'field{i}'] = getattr(device, f'field{i}')
+                device_dict['field_marks'][f'field{i}_mark'] = getattr(device, f'field{i}_mark')
         
         return jsonify(device_dict)
     
@@ -390,7 +411,11 @@ Data related routes for data management
 def update_device_data(deviceID):
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
     # print('device is ', device)
-    
+    # get the values of the fields for the device from device table
+    field_label = {}
+    for i in range(1, 21):
+        field_label[f'field{i}'] = getattr(device, f'field{i}')
+
     # Retrieve the api_key from the query parameters
     writekey = request.args.get('api_key')
     
@@ -399,7 +424,10 @@ def update_device_data(deviceID):
         # Updating data fields
         fields = {}
         for i in range(1, 21):
-            fields[f'field{i}'] = request.args.get(f'field{i}', None)
+            if field_label[f'field{i}']:
+                fields[f'field{i}'] = clean_data(request.args.get(f'field{i}', None))
+            else:
+                fields[f'field{i}'] = None
 
         # Create a new entry in the MetadataValues table
         new_entry = MetadataValues(
