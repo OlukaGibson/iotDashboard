@@ -43,18 +43,11 @@ class Firmware(db.Model):
         self.change9 = change9
         self.change10 = change10
 
-class Devices(db.Model):
-    __tablename__ = 'devices'
+class Profiles(db.Model):
+    __tablename__ = 'profiles'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True)
-    readkey = db.Column(db.String(100), unique=True)
-    deviceID = db.Column(db.Integer, unique=True)
-    writekey = db.Column(db.String(100), unique=True)
-    currentFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
-    previousFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
-    targetFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
-    fileDownloadState = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    description = db.Column(db.String(100), default=None)
     field1 = db.Column(db.String(100), default=None)
     field1_mark = db.Column(db.Boolean, default=False)
     field2 = db.Column(db.String(100), default=None)
@@ -95,16 +88,11 @@ class Devices(db.Model):
     field19_mark = db.Column(db.Boolean, default=False)
     field20 = db.Column(db.String(100), default=None)
     field20_mark = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
 
-    def __init__(self, name, readkey, writekey, deviceID, currentFirmwareVersion, previousFirmwareVersion, targetFirmwareVersion, fileDownloadState ,field1, field1_mark, field2, field2_mark, field3, field3_mark, field4, field4_mark, field5, field5_mark, field6, field6_mark, field7, field7_mark, field8, field8_mark, field9, field9_mark, field10, field10_mark, field11, field11_mark, field12, field12_mark, field13, field13_mark, field14, field14_mark, field15, field15_mark, field16, field16_mark, field17, field17_mark, field18, field18_mark, field19, field19_mark, field20, field20_mark):
+    def __init__(self, name, description, field1, field1_mark, field2, field2_mark, field3, field3_mark, field4, field4_mark, field5, field5_mark, field6, field6_mark, field7, field7_mark, field8, field8_mark, field9, field9_mark, field10, field10_mark, field11, field11_mark, field12, field12_mark, field13, field13_mark, field14, field14_mark, field15, field15_mark, field16, field16_mark, field17, field17_mark, field18, field18_mark, field19, field19_mark, field20, field20_mark):
         self.name = name
-        self.readkey = readkey
-        self.writekey = writekey
-        self.deviceID = deviceID
-        self.currentFirmwareVersion = currentFirmwareVersion
-        self.previousFirmwareVersion = previousFirmwareVersion
-        self.targetFirmwareVersion = targetFirmwareVersion
-        self.fileDownloadState = fileDownloadState
+        self.description = description
         self.field1 = field1
         self.field1_mark = field1_mark
         self.field2 = field2
@@ -145,6 +133,35 @@ class Devices(db.Model):
         self.field19_mark = field19_mark
         self.field20 = field20
         self.field20_mark = field20_mark
+
+class Devices(db.Model):
+    __tablename__ = 'devices'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True)
+    readkey = db.Column(db.String(100), unique=True)
+    deviceID = db.Column(db.Integer, unique=True)
+    writekey = db.Column(db.String(100), unique=True)
+    imsi = db.Column(db.String(100), default=None)
+    imei = db.Column(db.String(100), default=None)
+    currentFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
+    previousFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
+    targetFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
+    fileDownloadState = db.Column(db.Boolean, default=False)
+    profile = db.Column(db.Integer, db.ForeignKey('profiles.id'), default=None)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+    def __init__(self, name, readkey, writekey, deviceID,  imsi, imei, profile,currentFirmwareVersion, previousFirmwareVersion, targetFirmwareVersion, fileDownloadState ):
+        self.name = name
+        self.readkey = readkey
+        self.writekey = writekey
+        self.deviceID = deviceID
+        self.imsi = imsi
+        self.imei = imei
+        self.profile = profile
+        self.currentFirmwareVersion = currentFirmwareVersion
+        self.previousFirmwareVersion = previousFirmwareVersion
+        self.targetFirmwareVersion = targetFirmwareVersion
+        self.fileDownloadState = fileDownloadState
 
 class MetadataValues(db.Model):
     __tablename__ = 'metadatavalues'

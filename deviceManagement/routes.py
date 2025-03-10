@@ -1,7 +1,7 @@
 from flask import Blueprint, redirect, url_for, render_template, request, send_file, jsonify
 import os
 from .extentions import db
-from .models import Devices, MetadataValues, Firmware, DeviceFiles
+from .models import Devices, MetadataValues, Firmware, DeviceFiles, Profiles
 from google.cloud import storage
 import io
 import json
@@ -249,17 +249,13 @@ def add_device():
     readkey = clean_data(request.form.get('readkey'))
     writekey = clean_data(request.form.get('writekey'))
     deviceID = clean_data(request.form.get('deviceID'))
+    imsi = clean_data(request.form.get('imsi'))
+    imei = clean_data(request.form.get('imei'))
     currentFirmwareVersion = clean_data(request.form.get('currentFirmwareVersion'))
     previousFirmwareVersion = clean_data(request.form.get('previousFirmwareVersion'))
     targetFirmwareVersion = clean_data(request.form.get('targetFirmwareVersion'))
+    profile = clean_data(request.form.get('profile'))
     fileDownloadState = request.form.get('fileDownloadState', 'False').lower() in ['true', '1', 't', 'y', 'yes']
-        
-    # Extract dynamic fields and their marks from form data (field1 to field20)
-    fields = {}
-    field_marks = {}
-    for i in range(1, 21):
-        fields[f'field{i}'] = clean_data(request.form.get(f'field{i}', None))
-        field_marks[f'field{i}_mark'] = clean_data(request.form.get(f'field{i}_mark', 'False').lower() in ['true', '1', 't', 'y', 'yes'])
     
     # Create a new device object
     new_device = Devices(
@@ -267,12 +263,13 @@ def add_device():
         readkey=readkey,
         writekey=writekey,
         deviceID=deviceID,
+        imsi=imsi,
+        imei=imei,
         currentFirmwareVersion=currentFirmwareVersion,
         previousFirmwareVersion=previousFirmwareVersion,
         targetFirmwareVersion=targetFirmwareVersion,
         fileDownloadState=fileDownloadState,
-        **fields,
-        **field_marks
+        profile=profile
     )
 
     # Add the new device to the database and commit the transaction
@@ -293,18 +290,14 @@ def get_devices():
             'readkey': device.readkey,
             'writekey': device.writekey,
             'deviceID': device.deviceID,
+            'imsi': device.imsi,
+            'imei': device.imei,
             'currentFirmwareVersion': device.currentFirmwareVersion,
             'previousFirmwareVersion': device.previousFirmwareVersion,
             'fileDownloadState': device.fileDownloadState,
             'targetFirmwareVersion': device.targetFirmwareVersion,
-            'created_at': device.created_at,
-            'fields': {},
-            'field_marks': {}
+            'created_at': device.created_at
         }
-        for i in range(1, 21):
-            if getattr(device, f'field{i}'):
-                device_dict['fields'][f'field{i}'] = getattr(device, f'field{i}')
-                device_dict['field_marks'][f'field{i}_mark'] = getattr(device, f'field{i}_mark')
         
         devices_list.append(device_dict)
     
@@ -315,6 +308,23 @@ def get_devices():
 def get_device(deviceID):
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
     
+    deviceProflie = db.session.query(Profiles).filter_by(id=device.profile).first()
+    if deviceProflie:
+        profile_dict = {
+            'id': deviceProflie.id,
+            'name': deviceProflie.name,
+            'description': deviceProflie.description,
+            'created_at': deviceProflie.created_at,
+            'fields': {},
+            'field_marks': {}
+        }
+        for i in range(1, 21):
+            if getattr(deviceProflie, f'field{i}'):
+                profile_dict['fields'][f'field{i}'] = getattr(deviceProflie, f'field{i}')
+                profile_dict['field_marks'][f'field{i}_mark'] = getattr(deviceProflie, f'field{i}_mark')
+    else:
+        profile_dict = None
+
     if device:
          # first 100 records of device data
         device_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
@@ -323,13 +333,10 @@ def get_device(deviceID):
             data_dict = {
                 'entryID': data.id,
                 'created_at': data.created_at,
-                'fields': {}
             }
-            for i in range(1, 21):
-                if getattr(data, f'field{i}'):
-                    data_dict['fields'][f'field{i}'] = getattr(data, f'field{i}')
 
             device_data_list.append(data_dict)
+            
         device_dict = {
             'id': device.id,
             'created_at': device.created_at,
@@ -337,17 +344,15 @@ def get_device(deviceID):
             'readkey': device.readkey,
             'writekey': device.writekey,
             'deviceID': device.deviceID,
+            'profile': device.profile,
             'currentFirmwareVersion': device.currentFirmwareVersion,
             'previousFirmwareVersion': device.previousFirmwareVersion,
+            'imsi': device.imsi,
+            'imei': device.imei,
             'fileDownloadState': device.fileDownloadState,
-            'fields': {},
-            'field_marks': {},
-            'device_data': device_data_list
+            'device_data': device_data_list,
+            'profile': profile_dict
         }
-        for i in range(1, 21):
-            if getattr(device, f'field{i}'):
-                device_dict['fields'][f'field{i}'] = getattr(device, f'field{i}')
-                device_dict['field_marks'][f'field{i}_mark'] = getattr(device, f'field{i}_mark')
         
         return jsonify(device_dict)
     
@@ -366,6 +371,8 @@ def edit_device(deviceID):
         name = request.form.get('name', device.name)
         readkey = request.form.get('readkey', device.readkey)
         writekey = request.form.get('writekey', device.writekey)
+        imsi = request.form.get('imsi', device.imsi)
+        imei = request.form.get('imei', device.imei)
         currentFirmwareVersion = request.form.get('currentFirmwareVersion', device.currentFirmwareVersion)
         previousFirmwareVersion = request.form.get('previousFirmwareVersion', device.previousFirmwareVersion)
         targetFirmwareVersion = request.form.get('targetFirmwareVersion', device.targetFirmwareVersion)
@@ -380,6 +387,8 @@ def edit_device(deviceID):
         device.name = name
         device.readkey = readkey
         device.writekey = writekey
+        device.imsi = imsi
+        device.imei = imei
         device.currentFirmwareVersion = currentFirmwareVersion
         device.previousFirmwareVersion = previousFirmwareVersion
         device.targetFirmwareVersion = targetFirmwareVersion
@@ -401,6 +410,162 @@ def edit_device(deviceID):
         return {'message': 'Device updated successfully!'}
 
     return {'message': 'Use POST method to update device data!'}
+
+#device self configuration
+@device_management.route('/device/<int:orgID>/selfconfig', methods=['GET'])
+def self_config(orgID):
+    if orgID != 1234:
+        return {'message': 'Invalid organization ID!'}, 403
+    
+    imsi = clean_data(request.args.get('imsi', None))
+    if imsi == '234502106051372':
+        try:
+            name = 'AQ_123' #clean_data(request.args.get('name', None))
+            readkey = 'testreadkey' #clean_data(request.args.get('readkey', None)) 
+            writekey = 'testwritekey' #clean_data(request.args.get('writekey', None))
+            currentFirmwareVersion = None #clean_data(request.args.get('currentFirmwareVersion', None))
+            previousFirmwareVersion = None #clean_data(request.args.get('previousFirmwareVersion', None))
+            targetFirmwareVersion = None #clean_data(request.args.get('targetFirmwareVersion', None))
+            fileDownloadState = request.args.get('fileDownloadState', 'False').lower() in ['true', '1', 't', 'y', 'yes']
+            # if readkey is null assign a random string of length 8
+            # if readkey is None:
+            #     readkey = 'testwritekey'#.join(random.choices(string.ascii_letters + string.digits, k=8))
+
+            # if writekey is None:
+            #     writekey = 'testwritekey'#.join(random.choices(string.ascii_letters + string.digits, k=8))
+
+            fields = {}
+            field_marks = {}
+            for i in range(1, 21):
+                fields[f'field{i}'] = clean_data(request.args.get(f'field{i}', None))
+                field_marks[f'field{i}_mark'] = clean_data(request.args.get(f'field{i}_mark', 'False').lower() in ['true', '1', 't', 'y', 'yes'])
+
+            new_device = Devices(
+                name=name,
+                readkey=readkey,
+                writekey=writekey,
+                deviceID=12345,
+                fileDownloadState=fileDownloadState,
+                currentFirmwareVersion=currentFirmwareVersion,
+                previousFirmwareVersion=previousFirmwareVersion,
+                targetFirmwareVersion=targetFirmwareVersion,
+                **fields,
+                **field_marks
+            )
+
+            db.session.add(new_device)
+            db.session.commit()
+
+            return {'message': 'Device self-configured successfully!'}
+        
+        except Exception as e:
+            return {'message': 'Device self-configuration failed!', 'error': str(e)}, 500
+
+    return {'message': 'Invalid IMSI!'}, 403
+
+""""
+Profile related routes for profile management
+"""        
+# Define a route to add a new profile
+@device_management.route('/addprofile', methods=['POST'])
+def add_profile():
+    name = clean_data(request.form.get('name'))
+    description = clean_data(request.form.get('description', None))
+    # Extract dynamic fields and their marks from form data (field1 to field20)
+    fields = {}
+    field_marks = {}
+    for i in range(1, 21):
+        fields[f'field{i}'] = clean_data(request.form.get(f'field{i}', None))
+        field_marks[f'field{i}_mark'] = clean_data(request.form.get(f'field{i}_mark', 'False').lower() in ['true', '1', 't', 'y', 'yes'])
+
+    new_profile = Profiles(
+        name=name,
+        description=description,
+        **fields,
+        **field_marks
+    )
+
+    db.session.add(new_profile)
+    db.session.commit()
+
+    return {'message': 'New profile added successfully!'}
+
+# Define a route to retrieve all profiles
+@device_management.route('/get_profiles', methods=['GET'])
+def get_profiles():
+    profiles = db.session.query(Profiles).all()
+    profiles_list = []
+    for profile in profiles:
+        profile_dict = {
+            'id': profile.id,
+            'name': profile.name,
+            'description': profile.description,
+            'created_at': profile.created_at,
+            'fields': {},
+            'field_marks': {}
+        }
+        for i in range(1, 21):
+            if getattr(profile, f'field{i}'):
+                profile_dict['fields'][f'field{i}'] = getattr(profile, f'field{i}')
+                profile_dict['field_marks'][f'field{i}_mark'] = getattr(profile, f'field{i}_mark')
+        
+        profiles_list.append(profile_dict)
+    
+    return jsonify(profiles_list)
+
+# Define a route to retrieve a specific profile
+@device_management.route('/get_profile/<int:profileID>', methods=['GET'])
+def get_profile(profileID):
+    profile = db.session.query(Profiles).filter_by(id=profileID).first()
+    if profile:
+        profile_dict = {
+            'id': profile.id,
+            'name': profile.name,
+            'description': profile.description,
+            'created_at': profile.created_at,
+            'fields': {},
+            'field_marks': {}
+        }
+        for i in range(1, 21):
+            if getattr(profile, f'field{i}'):
+                profile_dict['fields'][f'field{i}'] = getattr(profile, f'field{i}')
+                profile_dict['field_marks'][f'field{i}_mark'] = getattr(profile, f'field{i}_mark')
+        
+        return jsonify(profile_dict)
+    
+    return {'message': 'Profile not found!'}, 404
+
+# Define a route to edit a profile
+# @device_management.route('/profile/<int:profileID>/edit', methods=['GET', 'POST'])
+# def edit_profile(profileID):
+#     profile = db.session.query(Profiles).filter_by(id=profileID).first()
+
+#     if not profile:
+#         return {'message': 'Profile not found!'}, 404
+
+#     if request.method == 'POST':
+#         name = request.form.get('name', profile.name)
+#         description = request.form.get('description', profile.description)
+
+#         fields = {}
+#         field_marks = {}
+#         for i in range(1, 21):
+#             fields[f'field{i}'] = request.form.get(f'field{i}', getattr(profile, f'field{i}'))
+#             field_marks[f'field{i}_mark'] = request.form.get(f'field{i}_mark', getattr(profile, f'field{i}_mark'))
+
+#         profile.name = name
+#         profile.description = description
+
+#         # Update fields and field_marks
+#         for i in range(1, 21):
+#             setattr(profile, f'field{i}', fields[f'field{i}'])
+#             setattr(profile, f'field{i}_mark', field_marks[f'field{i}_mark'])
+
+#         db.session.commit()
+
+#         return {'message': 'Profile updated successfully!'}
+
+#     return {'message': 'Use POST method to update profile data!'}, 400
 
 
 """
