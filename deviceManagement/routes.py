@@ -308,53 +308,58 @@ def get_devices():
 def get_device(deviceID):
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
     
-    deviceProflie = db.session.query(Profiles).filter_by(id=device.profile).first()
-    if deviceProflie:
+    if not device:
+        return {'message': 'Device not found!'}, 404
+
+    deviceProfile = db.session.query(Profiles).filter_by(id=device.profile).first()
+    if deviceProfile:
         profile_dict = {
-            'id': deviceProflie.id,
-            'name': deviceProflie.name,
-            'description': deviceProflie.description,
-            'created_at': deviceProflie.created_at,
+            'id': deviceProfile.id,
+            'name': deviceProfile.name,
+            'description': deviceProfile.description,
+            'created_at': deviceProfile.created_at,
             'fields': {},
             'field_marks': {}
         }
         for i in range(1, 21):
-            if getattr(deviceProflie, f'field{i}'):
-                profile_dict['fields'][f'field{i}'] = getattr(deviceProflie, f'field{i}')
-                profile_dict['field_marks'][f'field{i}_mark'] = getattr(deviceProflie, f'field{i}_mark')
+            field_value = getattr(deviceProfile, f'field{i}', None)
+            if field_value:
+                profile_dict['fields'][f'field{i}'] = field_value
+                profile_dict['field_marks'][f'field{i}_mark'] = getattr(deviceProfile, f'field{i}_mark', None)
     else:
         profile_dict = None
 
-    if device:
-         # first 100 records of device data
-        device_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
-        device_data_list = []
-        for data in device_data:
-            data_dict = {
-                'entryID': data.id,
-                'created_at': data.created_at,
-            }
-
-            device_data_list.append(data_dict)
-            
-        device_dict = {
-            'id': device.id,
-            'created_at': device.created_at,
-            'name': device.name,
-            'readkey': device.readkey,
-            'writekey': device.writekey,
-            'deviceID': device.deviceID,
-            'profile': device.profile,
-            'currentFirmwareVersion': device.currentFirmwareVersion,
-            'previousFirmwareVersion': device.previousFirmwareVersion,
-            'imsi': device.imsi,
-            'imei': device.imei,
-            'fileDownloadState': device.fileDownloadState,
-            'device_data': device_data_list,
-            'profile': profile_dict
+    # first 100 records of device data
+    device_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
+    device_data_list = []
+    for data in device_data:
+        data_dict = {
+            'entryID': data.id,
+            'created_at': data.created_at,
         }
+        for i in range(1, 21):
+            if getattr(data, f'field{i}', None):
+                data_dict[f'field{i}'] = getattr(data, f'field{i}', None)
+        device_data_list.append(data_dict)
         
-        return jsonify(device_dict)
+    device_dict = {
+        'id': device.id,
+        'created_at': device.created_at,
+        'name': device.name,
+        'readkey': device.readkey,
+        'writekey': device.writekey,
+        'deviceID': device.deviceID,
+        'profile': device.profile,
+        'currentFirmwareVersion': device.currentFirmwareVersion,
+        'previousFirmwareVersion': device.previousFirmwareVersion,
+        'imsi': device.imsi,
+        'imei': device.imei,
+        'fileDownloadState': device.fileDownloadState,
+        'device_data': device_data_list,
+        'profile': profile_dict
+    }
+    
+    return jsonify(device_dict)
     
     return {'message': 'Device not found!'}, 404
 
@@ -575,61 +580,66 @@ Data related routes for data management
 @device_management.route('/device/<int:deviceID>/update', methods=['GET'])
 def update_device_data(deviceID):
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
-    # print('device is ', device)
-    # get the values of the fields for the device from device table
-    field_label = {}
-    for i in range(1, 21):
-        field_label[f'field{i}'] = getattr(device, f'field{i}')
+    
+    if not device:
+        return {'message': 'Device not found!'}, 404
 
     # Retrieve the api_key from the query parameters
     writekey = request.args.get('api_key')
     
     # Check if the device exists and the provided writekey matches the device's writekey
-    if device and writekey == device.writekey:
-        # Updating data fields
-        fields = {}
-        for i in range(1, 21):
-            if field_label[f'field{i}']:
-                fields[f'field{i}'] = clean_data(request.args.get(f'field{i}', None))
-            else:
-                fields[f'field{i}'] = None
+    if writekey != device.writekey:
+        return {'message': 'Invalid API key!'}, 403
 
-        # Create a new entry in the MetadataValues table
-        new_entry = MetadataValues(
-            deviceID=device.deviceID,
-            **fields
-        )
+    # Get the profile associated with the device
+    profile = db.session.query(Profiles).filter_by(id=device.profile).first()
 
-        # Add the new entry to the database and commit
-        db.session.add(new_entry)
+    field_label = {}
+    for i in range(1, 21):
+        field_label[f'field{i}'] = getattr(profile, f'field{i}', None)
+
+    # Updating data fields
+    fields = {}
+    for i in range(1, 21):
+        if field_label[f'field{i}']:
+            fields[f'field{i}'] = clean_data(request.args.get(f'field{i}', None))
+        else:
+            fields[f'field{i}'] = None
+
+    # Create a new entry in the MetadataValues table
+    new_entry = MetadataValues(
+        deviceID=device.deviceID,
+        **fields
+    )
+
+    # Add the new entry to the database and commit
+    db.session.add(new_entry)
+    db.session.commit()
+
+    if device.fileDownloadState:
+        firmwareID = device.targetFirmwareVersion
+        firmware = db.session.query(Firmware).filter_by(id=firmwareID).first()
+        firmwareVersion = firmware.firmwareVersion
+        
+        storage_client = storage.Client(credentials=credentials)
+        bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
+        blob = bucket.blob(f'{firmwareVersion}.bin')
+
+        file_data = blob.download_as_string()
+        file_buffer = io.BytesIO(file_data)
+        file_buffer.seek(0)
+
+        device.fileDownloadState = False
         db.session.commit()
 
-        if device.fileDownloadState:
-            firmwareID = device.targetFirmwareVersion
-            firmware = db.session.query(Firmware).filter_by(id=firmwareID).first()
-            firmwareVersion = firmware.firmwareVersion
-            # firmwareVersion
-            storage_client = storage.Client(credentials=credentials)
-            bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
-            blob = bucket.blob(f'{firmwareVersion}.bin')
-    
-            file_data = blob.download_as_string()
-            file_buffer = io.BytesIO(file_data)
-            file_buffer.seek(0)
+        return send_file(
+            file_buffer,
+            as_attachment=True,
+            download_name=f'{firmwareVersion}.bin',
+            mimetype='application/octet-stream'
+        )
 
-            device.fileDownloadState = False
-            db.session.commit()
-
-            return send_file(
-                file_buffer,
-                as_attachment=True,
-                download_name=f'{firmwareVersion}.bin',
-                mimetype='application/octet-stream'
-            )
-
-        return {'message': 'Device data updated successfully!'}
-    
-    return {'message': 'Invalid API key!'}, 403
+    return {'message': 'Device data updated successfully!'}, 200
 
 # Define a route to retrieve device data
 @device_management.route('/device/<int:deviceID>/data', methods=['GET'])
