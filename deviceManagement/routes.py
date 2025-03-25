@@ -30,8 +30,14 @@ def clean_data(data):
 # Define a route for landing page
 @device_management.route('/')
 def device_storage():
+    port = request.environ.get('SERVER_PORT')
+    scheme = request.scheme
     print('Device storage is full!')
-    return {'message': 'Device storage is full!'}
+    return {
+        'message': 'Device storage is full!',
+        'port': port,
+        'scheme': scheme
+    }
 
 
 
@@ -417,56 +423,75 @@ def edit_device(deviceID):
     return {'message': 'Use POST method to update device data!'}
 
 #device self configuration
-@device_management.route('/device/<int:orgID>/selfconfig', methods=['GET'])
-def self_config(orgID):
-    if orgID != 1234:
-        return {'message': 'Invalid organization ID!'}, 403
+@device_management.route('/device/<int:imsi>/selfconfig', methods=['GET'])
+def self_config(imsi):
+    imsi = str(imsi)
+    device = db.session.query(Devices).filter_by(imsi=imsi).first()
+    if not device:
+        return {'message': 'Device not found!'}, 404
+
+    try:
+        device_details = {
+            'name': device.name,
+            'deviceID': device.deviceID,
+            'imsi': device.imsi,
+            'writekey': device.writekey
+        }
+
+        return jsonify(device_details)
+
+    except Exception as e:
+        return {'message': 'Device self-configuration failed!', 'error': str(e)}, 500
+# @device_management.route('/device/<int:orgID>/selfconfig', methods=['GET'])
+# def self_config(orgID):
+#     if orgID != 1234:
+#         return {'message': 'Invalid organization ID!'}, 403
     
-    imsi = clean_data(request.args.get('imsi', None))
-    if imsi == '234502106051372':
-        try:
-            name = 'AQ_123' #clean_data(request.args.get('name', None))
-            readkey = 'testreadkey' #clean_data(request.args.get('readkey', None)) 
-            writekey = 'testwritekey' #clean_data(request.args.get('writekey', None))
-            currentFirmwareVersion = None #clean_data(request.args.get('currentFirmwareVersion', None))
-            previousFirmwareVersion = None #clean_data(request.args.get('previousFirmwareVersion', None))
-            targetFirmwareVersion = None #clean_data(request.args.get('targetFirmwareVersion', None))
-            fileDownloadState = request.args.get('fileDownloadState', 'False').lower() in ['true', '1', 't', 'y', 'yes']
-            # if readkey is null assign a random string of length 8
-            # if readkey is None:
-            #     readkey = 'testwritekey'#.join(random.choices(string.ascii_letters + string.digits, k=8))
+#     imsi = clean_data(request.args.get('imsi', None))
+#     if imsi == '234502106051372':
+#         try:
+#             name = 'AQ_123' #clean_data(request.args.get('name', None))
+#             readkey = 'testreadkey' #clean_data(request.args.get('readkey', None)) 
+#             writekey = 'testwritekey' #clean_data(request.args.get('writekey', None))
+#             currentFirmwareVersion = None #clean_data(request.args.get('currentFirmwareVersion', None))
+#             previousFirmwareVersion = None #clean_data(request.args.get('previousFirmwareVersion', None))
+#             targetFirmwareVersion = None #clean_data(request.args.get('targetFirmwareVersion', None))
+#             fileDownloadState = request.args.get('fileDownloadState', 'False').lower() in ['true', '1', 't', 'y', 'yes']
+#             # if readkey is null assign a random string of length 8
+#             # if readkey is None:
+#             #     readkey = 'testwritekey'#.join(random.choices(string.ascii_letters + string.digits, k=8))
 
-            # if writekey is None:
-            #     writekey = 'testwritekey'#.join(random.choices(string.ascii_letters + string.digits, k=8))
+#             # if writekey is None:
+#             #     writekey = 'testwritekey'#.join(random.choices(string.ascii_letters + string.digits, k=8))
 
-            fields = {}
-            field_marks = {}
-            for i in range(1, 21):
-                fields[f'field{i}'] = clean_data(request.args.get(f'field{i}', None))
-                field_marks[f'field{i}_mark'] = clean_data(request.args.get(f'field{i}_mark', 'False').lower() in ['true', '1', 't', 'y', 'yes'])
+#             fields = {}
+#             field_marks = {}
+#             for i in range(1, 21):
+#                 fields[f'field{i}'] = clean_data(request.args.get(f'field{i}', None))
+#                 field_marks[f'field{i}_mark'] = clean_data(request.args.get(f'field{i}_mark', 'False').lower() in ['true', '1', 't', 'y', 'yes'])
 
-            new_device = Devices(
-                name=name,
-                readkey=readkey,
-                writekey=writekey,
-                deviceID=12345,
-                fileDownloadState=fileDownloadState,
-                currentFirmwareVersion=currentFirmwareVersion,
-                previousFirmwareVersion=previousFirmwareVersion,
-                targetFirmwareVersion=targetFirmwareVersion,
-                **fields,
-                **field_marks
-            )
+#             new_device = Devices(
+#                 name=name,
+#                 readkey=readkey,
+#                 writekey=writekey,
+#                 deviceID=12345,
+#                 fileDownloadState=fileDownloadState,
+#                 currentFirmwareVersion=currentFirmwareVersion,
+#                 previousFirmwareVersion=previousFirmwareVersion,
+#                 targetFirmwareVersion=targetFirmwareVersion,
+#                 **fields,
+#                 **field_marks
+#             )
 
-            db.session.add(new_device)
-            db.session.commit()
+#             db.session.add(new_device)
+#             db.session.commit()
 
-            return {'message': 'Device self-configured successfully!'}
+#             return {'message': 'Device self-configured successfully!'}
         
-        except Exception as e:
-            return {'message': 'Device self-configuration failed!', 'error': str(e)}, 500
+#         except Exception as e:
+#             return {'message': 'Device self-configuration failed!', 'error': str(e)}, 500
 
-    return {'message': 'Invalid IMSI!'}, 403
+#     return {'message': 'Invalid IMSI!'}, 403
 
 """"
 Profile related routes for profile management

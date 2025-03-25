@@ -13,7 +13,7 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
 
-    CORS(app, origins=["http://localhost:3000", "http://localhost:5173"])
+    CORS(app, origins="*")
 
     app.register_blueprint(device_management)
 
