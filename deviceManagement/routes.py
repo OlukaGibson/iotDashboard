@@ -8,7 +8,7 @@ import json
 from google.oauth2 import service_account
 from dotenv import load_dotenv
 from intelhex import IntelHex
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 load_dotenv()
@@ -442,56 +442,6 @@ def self_config(imsi):
 
     except Exception as e:
         return {'message': 'Device self-configuration failed!', 'error': str(e)}, 500
-# @device_management.route('/device/<int:orgID>/selfconfig', methods=['GET'])
-# def self_config(orgID):
-#     if orgID != 1234:
-#         return {'message': 'Invalid organization ID!'}, 403
-    
-#     imsi = clean_data(request.args.get('imsi', None))
-#     if imsi == '234502106051372':
-#         try:
-#             name = 'AQ_123' #clean_data(request.args.get('name', None))
-#             readkey = 'testreadkey' #clean_data(request.args.get('readkey', None)) 
-#             writekey = 'testwritekey' #clean_data(request.args.get('writekey', None))
-#             currentFirmwareVersion = None #clean_data(request.args.get('currentFirmwareVersion', None))
-#             previousFirmwareVersion = None #clean_data(request.args.get('previousFirmwareVersion', None))
-#             targetFirmwareVersion = None #clean_data(request.args.get('targetFirmwareVersion', None))
-#             fileDownloadState = request.args.get('fileDownloadState', 'False').lower() in ['true', '1', 't', 'y', 'yes']
-#             # if readkey is null assign a random string of length 8
-#             # if readkey is None:
-#             #     readkey = 'testwritekey'#.join(random.choices(string.ascii_letters + string.digits, k=8))
-
-#             # if writekey is None:
-#             #     writekey = 'testwritekey'#.join(random.choices(string.ascii_letters + string.digits, k=8))
-
-#             fields = {}
-#             field_marks = {}
-#             for i in range(1, 21):
-#                 fields[f'field{i}'] = clean_data(request.args.get(f'field{i}', None))
-#                 field_marks[f'field{i}_mark'] = clean_data(request.args.get(f'field{i}_mark', 'False').lower() in ['true', '1', 't', 'y', 'yes'])
-
-#             new_device = Devices(
-#                 name=name,
-#                 readkey=readkey,
-#                 writekey=writekey,
-#                 deviceID=12345,
-#                 fileDownloadState=fileDownloadState,
-#                 currentFirmwareVersion=currentFirmwareVersion,
-#                 previousFirmwareVersion=previousFirmwareVersion,
-#                 targetFirmwareVersion=targetFirmwareVersion,
-#                 **fields,
-#                 **field_marks
-#             )
-
-#             db.session.add(new_device)
-#             db.session.commit()
-
-#             return {'message': 'Device self-configured successfully!'}
-        
-#         except Exception as e:
-#             return {'message': 'Device self-configuration failed!', 'error': str(e)}, 500
-
-#     return {'message': 'Invalid IMSI!'}, 403
 
 """"
 Profile related routes for profile management
@@ -565,44 +515,11 @@ def get_profile(profileID):
     
     return {'message': 'Profile not found!'}, 404
 
-# Define a route to edit a profile
-# @device_management.route('/profile/<int:profileID>/edit', methods=['GET', 'POST'])
-# def edit_profile(profileID):
-#     profile = db.session.query(Profiles).filter_by(id=profileID).first()
-
-#     if not profile:
-#         return {'message': 'Profile not found!'}, 404
-
-#     if request.method == 'POST':
-#         name = request.form.get('name', profile.name)
-#         description = request.form.get('description', profile.description)
-
-#         fields = {}
-#         field_marks = {}
-#         for i in range(1, 21):
-#             fields[f'field{i}'] = request.form.get(f'field{i}', getattr(profile, f'field{i}'))
-#             field_marks[f'field{i}_mark'] = request.form.get(f'field{i}_mark', getattr(profile, f'field{i}_mark'))
-
-#         profile.name = name
-#         profile.description = description
-
-#         # Update fields and field_marks
-#         for i in range(1, 21):
-#             setattr(profile, f'field{i}', fields[f'field{i}'])
-#             setattr(profile, f'field{i}_mark', field_marks[f'field{i}_mark'])
-
-#         db.session.commit()
-
-#         return {'message': 'Profile updated successfully!'}
-
-#     return {'message': 'Use POST method to update profile data!'}, 400
-
-
 """
 Data related routes for data management
 """
-# Define a route to update device data
-@device_management.route('/device/<int:deviceID>/update', methods=['GET'])
+# Singular data update route
+@device_management.route('/update', methods=['GET'])
 def update_device_data(deviceID):
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
     
@@ -666,8 +583,75 @@ def update_device_data(deviceID):
 
     return {'message': 'Device data updated successfully!'}, 200
 
+#Bulk data update route
+# https://api.thingspeak.com/channels/<channel_id>/bulk_update.json
+@device_management.route('/devices/<int:deviceID>/bulk_update_json', methods=['POST'])
+def bulk_update(deviceID):
+    device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+    if not device:
+        return {'message': 'Device not found!'}, 404
+
+    json_data = request.get_json()
+    if not json_data:
+        return {'message': 'No data provided!'}, 400
+
+    write_api_key = json_data.get('write_api_key')
+    if write_api_key != device.writekey:
+        return {'message': 'Invalid API key!'}, 403
+
+    updates = json_data.get('updates')
+    if not updates or not isinstance(updates, list):
+        return {'message': 'Invalid data format!'}, 400
+
+    try:
+        if 'created_at' in updates[0]:
+            for update in updates:
+                created_at = update.get('created_at')
+                created_at = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
+                fields = {}
+                for i in range(1, 21):
+                    fields[f'field{i}'] = update.get(f'field{i}', None)
+
+                new_entry = MetadataValues(
+                    deviceID=device.deviceID,
+                    created_at=created_at,
+                    **fields
+                )
+                db.session.add(new_entry)
+
+            db.session.commit()
+            return {'message': 'success'}, 200
+
+        elif 'delta_t' in updates[0]:  # Corrected key from 'delta' to 'delta_t'
+            created_at = datetime.now()
+            for update in updates:
+                if update == updates[0]:
+                    created_at = datetime.now()
+                else:
+                    created_at = created_at - timedelta(seconds=update.get('delta_t'))  # Corrected key
+
+                fields = {}
+                for i in range(1, 21):
+                    fields[f'field{i}'] = update.get(f'field{i}', None)
+
+                new_entry = MetadataValues(
+                    deviceID=device.deviceID,
+                    created_at=created_at,
+                    **fields
+                )
+                db.session.add(new_entry)
+
+            db.session.commit()
+            return {'message': 'success'}, 200
+
+        else:
+            return {'message': 'Invalid update format!'}, 400
+
+    except Exception as e:
+        return {'message': 'Server error', 'error': str(e)}, 500
+
+
 # Define a route to retrieve device data
-@device_management.route('/device/<int:deviceID>/data', methods=['GET'])
 def get_device_data(deviceID):
     # Retrieve the device from the database
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()

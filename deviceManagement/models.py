@@ -167,7 +167,7 @@ class MetadataValues(db.Model):
     __tablename__ = 'metadatavalues'
     id = db.Column(db.Integer, primary_key=True)
     deviceID = db.Column(db.Integer, db.ForeignKey('devices.deviceID'))
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    created_at = db.Column(db.DateTime)  # Removed server_default
     field1 = db.Column(db.String(100), default=None)
     field2 = db.Column(db.String(100), default=None)
     field3 = db.Column(db.String(100), default=None)
@@ -189,7 +189,8 @@ class MetadataValues(db.Model):
     field19 = db.Column(db.String(100), default=None)
     field20 = db.Column(db.String(100), default=None)
 
-    def __init__(self, deviceID, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, field16, field17, field18, field19, field20):
+    def __init__(self, created_at, deviceID, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, field16, field17, field18, field19, field20):
+        self.created_at = created_at
         self.deviceID = deviceID
         self.field1 = field1
         self.field2 = field2
