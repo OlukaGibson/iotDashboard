@@ -111,8 +111,7 @@ class Devices(db.Model):
     readkey = db.Column(db.String(100), unique=True)
     deviceID = db.Column(db.Integer, unique=True)
     writekey = db.Column(db.String(100), unique=True)
-    imsi = db.Column(db.String(100), default=None)
-    imei = db.Column(db.String(100), default=None)
+    networkID = db.Column(db.String(100), default=None)
     currentFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
     previousFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
     targetFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
@@ -120,13 +119,12 @@ class Devices(db.Model):
     profile = db.Column(db.Integer, db.ForeignKey('profiles.id'), default=None)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
-    def __init__(self, name, readkey, writekey, deviceID,  imsi, imei, profile,currentFirmwareVersion, previousFirmwareVersion, targetFirmwareVersion, fileDownloadState ):
+    def __init__(self, name, readkey, writekey, deviceID,  networkID, profile,currentFirmwareVersion, previousFirmwareVersion, targetFirmwareVersion, fileDownloadState ):
         self.name = name
         self.readkey = readkey
         self.writekey = writekey
         self.deviceID = deviceID
-        self.imsi = imsi
-        self.imei = imei
+        self.networkID = networkID
         self.profile = profile
         self.currentFirmwareVersion = currentFirmwareVersion
         self.previousFirmwareVersion = previousFirmwareVersion
