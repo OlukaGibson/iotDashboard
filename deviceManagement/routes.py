@@ -255,8 +255,7 @@ def add_device():
     readkey = clean_data(request.form.get('readkey'))
     writekey = clean_data(request.form.get('writekey'))
     deviceID = clean_data(request.form.get('deviceID'))
-    imsi = clean_data(request.form.get('imsi'))
-    imei = clean_data(request.form.get('imei'))
+    networkID = clean_data(request.form.get('networkID'))
     currentFirmwareVersion = clean_data(request.form.get('currentFirmwareVersion'))
     previousFirmwareVersion = clean_data(request.form.get('previousFirmwareVersion'))
     targetFirmwareVersion = clean_data(request.form.get('targetFirmwareVersion'))
@@ -269,8 +268,7 @@ def add_device():
         readkey=readkey,
         writekey=writekey,
         deviceID=deviceID,
-        imsi=imsi,
-        imei=imei,
+        networkID=networkID,
         currentFirmwareVersion=currentFirmwareVersion,
         previousFirmwareVersion=previousFirmwareVersion,
         targetFirmwareVersion=targetFirmwareVersion,
@@ -296,8 +294,7 @@ def get_devices():
             'readkey': device.readkey,
             'writekey': device.writekey,
             'deviceID': device.deviceID,
-            'imsi': device.imsi,
-            'imei': device.imei,
+            'networkID': device.networkID,
             'currentFirmwareVersion': device.currentFirmwareVersion,
             'previousFirmwareVersion': device.previousFirmwareVersion,
             'fileDownloadState': device.fileDownloadState,
@@ -373,8 +370,7 @@ def get_device(deviceID):
         'profile': device.profile,
         'currentFirmwareVersion': device.currentFirmwareVersion,
         'previousFirmwareVersion': device.previousFirmwareVersion,
-        'imsi': device.imsi,
-        'imei': device.imei,
+        'networkID': device.networkID,
         'fileDownloadState': device.fileDownloadState,
         'device_data': device_data_list,
         'config_data': config_data_list,
@@ -396,8 +392,7 @@ def edit_device(deviceID):
         name = request.form.get('name', device.name)
         readkey = request.form.get('readkey', device.readkey)
         writekey = request.form.get('writekey', device.writekey)
-        imsi = request.form.get('imsi', device.imsi)
-        imei = request.form.get('imei', device.imei)
+        networkID = request.form.get('networkID', device.networkID)
         currentFirmwareVersion = request.form.get('currentFirmwareVersion', device.currentFirmwareVersion)
         previousFirmwareVersion = request.form.get('previousFirmwareVersion', device.previousFirmwareVersion)
         targetFirmwareVersion = request.form.get('targetFirmwareVersion', device.targetFirmwareVersion)
@@ -414,8 +409,7 @@ def edit_device(deviceID):
         device.name = name
         device.readkey = readkey
         device.writekey = writekey
-        device.imsi = imsi
-        device.imei = imei
+        device.networkID = networkID
         device.currentFirmwareVersion = currentFirmwareVersion
         device.previousFirmwareVersion = previousFirmwareVersion
         device.targetFirmwareVersion = targetFirmwareVersion
@@ -436,10 +430,10 @@ def edit_device(deviceID):
     return {'message': 'Use POST method to update device data!'}
 
 #device self configuration
-@device_management.route('/device/<int:imsi>/selfconfig', methods=['GET'])
-def self_config(imsi):
-    imsi = str(imsi)
-    device = db.session.query(Devices).filter_by(imsi=imsi).first()
+@device_management.route('/device/<int:networkID>/selfconfig', methods=['GET'])
+def self_config(networkID):
+    networkID = str(networkID)
+    device = db.session.query(Devices).filter_by(networkID=networkID).first()
     if not device:
         return {'message': 'Device not found!'}, 404
 
@@ -447,7 +441,7 @@ def self_config(imsi):
         device_details = {
             'name': device.name,
             'deviceID': device.deviceID,
-            'imsi': device.imsi,
+            'networkID': device.networkID,
             'writekey': device.writekey
         }
 
