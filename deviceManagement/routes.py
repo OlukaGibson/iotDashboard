@@ -318,6 +318,7 @@ def get_device(deviceID):
         return {'message': 'Device not found!'}, 404
 
     deviceProfile = db.session.query(Profiles).filter_by(id=device.profile).first()
+    
     if deviceProfile:
         profile_dict = {
             'id': deviceProfile.id,
@@ -325,25 +326,39 @@ def get_device(deviceID):
             'description': deviceProfile.description,
             'created_at': deviceProfile.created_at,
             'fields': {},
-            'field_marks': {}
+            'configs': {}
         }
-        for i in range(1, 21):
-            field_value = getattr(deviceProfile, f'field{i}', None)
-            if field_value:
-                profile_dict['fields'][f'field{i}'] = field_value
-                profile_dict['field_marks'][f'field{i}_mark'] = getattr(deviceProfile, f'field{i}_mark', None)
+        for i in range(1, 16):
+            if getattr(deviceProfile, f'field{i}') is not None:
+                profile_dict['fields'][f'field{i}'] = getattr(deviceProfile, f'field{i}')
+        
+        for i in range(1, 11):
+            if getattr(deviceProfile, f'config{i}') is not None:
+                profile_dict['configs'][f'config{i}'] = getattr(deviceProfile, f'config{i}')
     else:
         profile_dict = None
 
     # first 100 records of device data
     device_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
+    config_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
     device_data_list = []
+    config_data_list = []
+    for data in config_data:
+        data_dict = {
+            'entryID': data.id,
+            'created_at': data.created_at,
+        }
+        for i in range(1, 11):
+            if getattr(data, f'config{i}', None):
+                data_dict[f'config{i}'] = getattr(data, f'config{i}', None)
+        config_data_list.append(data_dict)
+
     for data in device_data:
         data_dict = {
             'entryID': data.id,
             'created_at': data.created_at,
         }
-        for i in range(1, 21):
+        for i in range(1, 16):
             if getattr(data, f'field{i}', None):
                 data_dict[f'field{i}'] = getattr(data, f'field{i}', None)
         device_data_list.append(data_dict)
@@ -362,12 +377,11 @@ def get_device(deviceID):
         'imei': device.imei,
         'fileDownloadState': device.fileDownloadState,
         'device_data': device_data_list,
+        'config_data': config_data_list,
         'profile': profile_dict
     }
     
     return jsonify(device_dict)
-    
-    return {'message': 'Device not found!'}, 404
 
 # Edit device data
 @device_management.route('/device/<int:deviceID>/edit', methods=['GET', 'POST'])
@@ -390,10 +404,12 @@ def edit_device(deviceID):
         fileDownloadState = request.form.get('fileDownloadState', device.fileDownloadState)
 
         fields = {}
-        field_marks = {}
-        for i in range(1, 21):
+        configs = {}
+        for i in range(1, 16):
             fields[f'field{i}'] = request.form.get(f'field{i}', getattr(device, f'field{i}'))
-            field_marks[f'field{i}_mark'] = request.form.get(f'field{i}_mark', getattr(device, f'field{i}_mark'))
+
+        for i in range(1, 11):
+            configs[f'config{i}'] = request.form.get(f'config{i}', getattr(device, f'config{i}'))
 
         device.name = name
         device.readkey = readkey
@@ -406,14 +422,11 @@ def edit_device(deviceID):
         device.fileDownloadState = fileDownloadState
 
         # Update fields
-        # for field, value in fields.items():
-        #     setattr(device, field, value)
-
-        # Update fields and field_marks
-        for i in range(1, 21):
+        for i in range(1, 16):
             setattr(device, f'field{i}', fields[f'field{i}'])
-            setattr(device, f'field{i}_mark', field_marks[f'field{i}_mark'])
-            
+        
+        for i in range(1, 11):
+            setattr(device, f'config{i}', configs[f'config{i}'])
 
         # Commit the changes to the database
         db.session.commit()
@@ -451,18 +464,20 @@ Profile related routes for profile management
 def add_profile():
     name = clean_data(request.form.get('name'))
     description = clean_data(request.form.get('description', None))
-    # Extract dynamic fields and their marks from form data (field1 to field20)
+
     fields = {}
-    field_marks = {}
-    for i in range(1, 21):
+    for i in range(1, 16):
         fields[f'field{i}'] = clean_data(request.form.get(f'field{i}', None))
-        field_marks[f'field{i}_mark'] = clean_data(request.form.get(f'field{i}_mark', 'False').lower() in ['true', '1', 't', 'y', 'yes'])
+    
+    configs = {}
+    for i in range(1, 11):
+        configs[f'config{i}'] = clean_data(request.form.get(f'config{i}', None))
 
     new_profile = Profiles(
         name=name,
         description=description,
         **fields,
-        **field_marks
+        **configs
     )
 
     db.session.add(new_profile)
@@ -482,12 +497,15 @@ def get_profiles():
             'description': profile.description,
             'created_at': profile.created_at,
             'fields': {},
-            'field_marks': {}
+            'configs': {}
         }
         for i in range(1, 21):
             if getattr(profile, f'field{i}'):
                 profile_dict['fields'][f'field{i}'] = getattr(profile, f'field{i}')
-                profile_dict['field_marks'][f'field{i}_mark'] = getattr(profile, f'field{i}_mark')
+
+        for i in range(1, 11):
+            if getattr(profile, f'config{i}'):
+                profile_dict['configs'][f'config{i}'] = getattr(profile, f'config{i}')
         
         profiles_list.append(profile_dict)
     
@@ -504,12 +522,15 @@ def get_profile(profileID):
             'description': profile.description,
             'created_at': profile.created_at,
             'fields': {},
-            'field_marks': {}
+            'configs': {}
         }
         for i in range(1, 21):
             if getattr(profile, f'field{i}'):
                 profile_dict['fields'][f'field{i}'] = getattr(profile, f'field{i}')
-                profile_dict['field_marks'][f'field{i}_mark'] = getattr(profile, f'field{i}_mark')
+
+        for i in range(1, 11):
+            if getattr(profile, f'config{i}'):
+                profile_dict['configs'][f'config{i}'] = getattr(profile, f'config{i}')
         
         return jsonify(profile_dict)
     

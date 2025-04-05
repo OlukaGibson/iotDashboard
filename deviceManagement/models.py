@@ -49,90 +49,60 @@ class Profiles(db.Model):
     name = db.Column(db.String(100), unique=True)
     description = db.Column(db.String(100), default=None)
     field1 = db.Column(db.String(100), default=None)
-    field1_mark = db.Column(db.Boolean, default=False)
     field2 = db.Column(db.String(100), default=None)
-    field2_mark = db.Column(db.Boolean, default=False)
     field3 = db.Column(db.String(100), default=None)
-    field3_mark = db.Column(db.Boolean, default=False)
     field4 = db.Column(db.String(100), default=None)
-    field4_mark = db.Column(db.Boolean, default=False)
     field5 = db.Column(db.String(100), default=None)
-    field5_mark = db.Column(db.Boolean, default=False)
     field6 = db.Column(db.String(100), default=None)
-    field6_mark = db.Column(db.Boolean, default=False)
     field7 = db.Column(db.String(100), default=None)
-    field7_mark = db.Column(db.Boolean, default=False)
     field8 = db.Column(db.String(100), default=None)
-    field8_mark = db.Column(db.Boolean, default=False)
     field9 = db.Column(db.String(100), default=None)
-    field9_mark = db.Column(db.Boolean, default=False)
     field10 = db.Column(db.String(100), default=None)
-    field10_mark = db.Column(db.Boolean, default=False)
     field11 = db.Column(db.String(100), default=None)
-    field11_mark = db.Column(db.Boolean, default=False)
     field12 = db.Column(db.String(100), default=None)
-    field12_mark = db.Column(db.Boolean, default=False)
     field13 = db.Column(db.String(100), default=None)
-    field13_mark = db.Column(db.Boolean, default=False)
     field14 = db.Column(db.String(100), default=None)
-    field14_mark = db.Column(db.Boolean, default=False)
     field15 = db.Column(db.String(100), default=None)
-    field15_mark = db.Column(db.Boolean, default=False)
-    field16 = db.Column(db.String(100), default=None)
-    field16_mark = db.Column(db.Boolean, default=False)
-    field17 = db.Column(db.String(100), default=None)
-    field17_mark = db.Column(db.Boolean, default=False)
-    field18 = db.Column(db.String(100), default=None)
-    field18_mark = db.Column(db.Boolean, default=False)
-    field19 = db.Column(db.String(100), default=None)
-    field19_mark = db.Column(db.Boolean, default=False)
-    field20 = db.Column(db.String(100), default=None)
-    field20_mark = db.Column(db.Boolean, default=False)
+    config1 = db.Column(db.String(100), default=None)
+    config2 = db.Column(db.String(100), default=None)
+    config3 = db.Column(db.String(100), default=None)
+    config4 = db.Column(db.String(100), default=None)
+    config5 = db.Column(db.String(100), default=None)
+    config6 = db.Column(db.String(100), default=None)
+    config7 = db.Column(db.String(100), default=None)
+    config8 = db.Column(db.String(100), default=None)
+    config9 = db.Column(db.String(100), default=None)
+    config10 = db.Column(db.String(100), default=None)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
-    def __init__(self, name, description, field1, field1_mark, field2, field2_mark, field3, field3_mark, field4, field4_mark, field5, field5_mark, field6, field6_mark, field7, field7_mark, field8, field8_mark, field9, field9_mark, field10, field10_mark, field11, field11_mark, field12, field12_mark, field13, field13_mark, field14, field14_mark, field15, field15_mark, field16, field16_mark, field17, field17_mark, field18, field18_mark, field19, field19_mark, field20, field20_mark):
+    def __init__(self, name, description, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, config1, config2, config3, config4, config5, config6, config7, config8, config9, config10):
         self.name = name
         self.description = description
         self.field1 = field1
-        self.field1_mark = field1_mark
         self.field2 = field2
-        self.field2_mark = field2_mark
         self.field3 = field3
-        self.field3_mark = field3_mark
         self.field4 = field4
-        self.field4_mark = field4_mark
         self.field5 = field5
-        self.field5_mark = field5_mark
         self.field6 = field6
-        self.field6_mark = field6_mark
         self.field7 = field7
-        self.field7_mark = field7_mark
         self.field8 = field8
-        self.field8_mark = field8_mark
         self.field9 = field9
-        self.field9_mark = field9_mark
         self.field10 = field10
-        self.field10_mark = field10_mark
         self.field11 = field11
-        self.field11_mark = field11_mark
         self.field12 = field12
-        self.field12_mark = field12_mark
         self.field13 = field13
-        self.field13_mark = field13_mark
         self.field14 = field14
-        self.field14_mark = field14_mark
         self.field15 = field15
-        self.field15_mark = field15_mark
-        self.field16 = field16
-        self.field16_mark = field16_mark
-        self.field17 = field17
-        self.field17_mark = field17_mark
-        self.field18 = field18
-        self.field18_mark = field18_mark
-        self.field19 = field19
-        self.field19_mark = field19_mark
-        self.field20 = field20
-        self.field20_mark = field20_mark
+        self.config1 = config1
+        self.config2 = config2
+        self.config3 = config3
+        self.config4 = config4
+        self.config5 = config5
+        self.config6 = config6
+        self.config7 = config7
+        self.config8 = config8
+        self.config9 = config9
+        self.config10 = config10
 
 class Devices(db.Model):
     __tablename__ = 'devices'
@@ -183,13 +153,8 @@ class MetadataValues(db.Model):
     field13 = db.Column(db.String(100), default=None)
     field14 = db.Column(db.String(100), default=None)
     field15 = db.Column(db.String(100), default=None)
-    field16 = db.Column(db.String(100), default=None)
-    field17 = db.Column(db.String(100), default=None)
-    field18 = db.Column(db.String(100), default=None)
-    field19 = db.Column(db.String(100), default=None)
-    field20 = db.Column(db.String(100), default=None)
 
-    def __init__(self, created_at, deviceID, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, field16, field17, field18, field19, field20):
+    def __init__(self, created_at, deviceID, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15):
         self.created_at = created_at
         self.deviceID = deviceID
         self.field1 = field1
@@ -207,11 +172,36 @@ class MetadataValues(db.Model):
         self.field13 = field13
         self.field14 = field14
         self.field15 = field15
-        self.field16 = field16
-        self.field17 = field17
-        self.field18 = field18
-        self.field19 = field19
-        self.field20 = field20
+
+class ConfigValues(db.Model):
+    __tablename__ = 'configvalues'
+    id = db.Column(db.Integer, primary_key=True)
+    deviceID = db.Column(db.Integer, db.ForeignKey('devices.deviceID'))
+    created_at = db.Column(db.DateTime)  
+    config1 = db.Column(db.String(100), default=None)
+    config2 = db.Column(db.String(100), default=None)
+    config3 = db.Column(db.String(100), default=None)
+    config4 = db.Column(db.String(100), default=None)
+    config5 = db.Column(db.String(100), default=None)
+    config6 = db.Column(db.String(100), default=None)
+    config7 = db.Column(db.String(100), default=None)
+    config8 = db.Column(db.String(100), default=None)
+    config9 = db.Column(db.String(100), default=None)
+    config10 = db.Column(db.String(100), default=None)
+
+    def __init__(self, created_at, deviceID, config1, config2, config3, config4, config5, config6, config7, config8, config9, config10):
+        self.created_at = created_at
+        self.deviceID = deviceID
+        self.config1 = config1
+        self.config2 = config2
+        self.config3 = config3
+        self.config4 = config4
+        self.config5 = config5
+        self.config6 = config6
+        self.config7 = config7
+        self.config8 = config8
+        self.config9 = config9
+        self.config10 = config10
 
 class DeviceFiles(db.Model):
     __tablename__ = 'devicefiles'
