@@ -429,27 +429,6 @@ def edit_device(deviceID):
 
     return {'message': 'Use POST method to update device data!'}
 
-#device self configuration
-@device_management.route('/device/<int:networkID>/selfconfig', methods=['GET'])
-def self_config(networkID):
-    networkID = str(networkID)
-    device = db.session.query(Devices).filter_by(networkID=networkID).first()
-    if not device:
-        return {'message': 'Device not found!'}, 404
-
-    try:
-        device_details = {
-            'name': device.name,
-            'deviceID': device.deviceID,
-            'networkID': device.networkID,
-            'writekey': device.writekey
-        }
-
-        return jsonify(device_details)
-
-    except Exception as e:
-        return {'message': 'Device self-configuration failed!', 'error': str(e)}, 500
-
 """"
 Profile related routes for profile management
 """        
@@ -529,6 +508,7 @@ def get_profile(profileID):
         return jsonify(profile_dict)
     
     return {'message': 'Profile not found!'}, 404
+
 
 """
 Data related routes for data management
@@ -665,7 +645,6 @@ def bulk_update(deviceID):
     except Exception as e:
         return {'message': 'Server error', 'error': str(e)}, 500
 
-
 # Define a route to retrieve device data
 def get_device_data(deviceID):
     # Retrieve the device from the database
@@ -693,6 +672,31 @@ def get_device_data(deviceID):
         return jsonify(entries_list)
     
     return {'message': 'Invalid API key!'}, 403
+
+
+""""
+Profile related routes for profile management
+"""    
+#device self configuration
+@device_management.route('/device/<int:networkID>/selfconfig', methods=['GET'])
+def self_config(networkID):
+    networkID = str(networkID)
+    device = db.session.query(Devices).filter_by(networkID=networkID).first()
+    if not device:
+        return {'message': 'Device not found!'}, 404
+
+    try:
+        device_details = {
+            'name': device.name,
+            'deviceID': device.deviceID,
+            'networkID': device.networkID,
+            'writekey': device.writekey
+        }
+
+        return jsonify(device_details)
+
+    except Exception as e:
+        return {'message': 'Device self-configuration failed!', 'error': str(e)}, 500
 
 
 """
