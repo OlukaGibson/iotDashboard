@@ -299,6 +299,7 @@ def get_devices():
             'previousFirmwareVersion': device.previousFirmwareVersion,
             'fileDownloadState': device.fileDownloadState,
             'targetFirmwareVersion': device.targetFirmwareVersion,
+            'profile': device.profile,
             'created_at': device.created_at
         }
         
@@ -310,7 +311,19 @@ def get_devices():
 @device_management.route('/get_device/<int:deviceID>', methods=['GET'])
 def get_device(deviceID):
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+
+    currentFirmwareID = device.currentFirmwareVersion
+    previousFirmwareID = device.previousFirmwareVersion
+    targetFirmwareID = device.targetFirmwareVersion
+
+    currentFirmware = db.session.query(Firmware).filter_by(id=currentFirmwareID).first()   #currentFirmwareVersion
+    previousFirmware = db.session.query(Firmware).filter_by(id=previousFirmwareID).first() #previousFirmwareVersion
+    targetFirmware = db.session.query(Firmware).filter_by(id=targetFirmwareID).first()     #targetFirmwareVersion
     
+    currentFirmwareVersion = currentFirmware.firmwareVersion if currentFirmware else None
+    previousFirmwareVersion = previousFirmware.firmwareVersion if previousFirmware else None
+    targetFirmwareVersion = targetFirmware.firmwareVersion if targetFirmware else None
+
     if not device:
         return {'message': 'Device not found!'}, 404
 
@@ -368,8 +381,9 @@ def get_device(deviceID):
         'writekey': device.writekey,
         'deviceID': device.deviceID,
         'profile': device.profile,
-        'currentFirmwareVersion': device.currentFirmwareVersion,
-        'previousFirmwareVersion': device.previousFirmwareVersion,
+        'currentFirmwareVersion': currentFirmwareVersion,
+        'targetFirmwareVersion': targetFirmwareVersion,
+        'previousFirmwareVersion': previousFirmwareVersion,
         'networkID': device.networkID,
         'fileDownloadState': device.fileDownloadState,
         'device_data': device_data_list,
@@ -472,7 +486,7 @@ def get_profiles():
             'fields': {},
             'configs': {}
         }
-        for i in range(1, 21):
+        for i in range(1, 16):
             if getattr(profile, f'field{i}'):
                 profile_dict['fields'][f'field{i}'] = getattr(profile, f'field{i}')
 
@@ -497,7 +511,7 @@ def get_profile(profileID):
             'fields': {},
             'configs': {}
         }
-        for i in range(1, 21):
+        for i in range(1, 16):
             if getattr(profile, f'field{i}'):
                 profile_dict['fields'][f'field{i}'] = getattr(profile, f'field{i}')
 
@@ -532,12 +546,12 @@ def update_device_data(deviceID):
     profile = db.session.query(Profiles).filter_by(id=device.profile).first()
 
     field_label = {}
-    for i in range(1, 21):
+    for i in range(1, 16):
         field_label[f'field{i}'] = getattr(profile, f'field{i}', None)
 
     # Updating data fields
     fields = {}
-    for i in range(1, 21):
+    for i in range(1, 16):
         if field_label[f'field{i}']:
             fields[f'field{i}'] = clean_data(request.args.get(f'field{i}', None))
         else:
@@ -604,7 +618,7 @@ def bulk_update(deviceID):
                 created_at = update.get('created_at')
                 created_at = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
                 fields = {}
-                for i in range(1, 21):
+                for i in range(1, 16):
                     fields[f'field{i}'] = update.get(f'field{i}', None)
 
                 new_entry = MetadataValues(
@@ -626,7 +640,7 @@ def bulk_update(deviceID):
                     created_at = created_at - timedelta(seconds=update.get('delta_t'))  # Corrected key
 
                 fields = {}
-                for i in range(1, 21):
+                for i in range(1, 16):
                     fields[f'field{i}'] = update.get(f'field{i}', None)
 
                 new_entry = MetadataValues(
@@ -664,7 +678,7 @@ def get_device_data(deviceID):
                 'created_at': entry.created_at,
                 'fields': {}
             }
-            for i in range(1, 21):
+            for i in range(1, 16):
                 entry_dict['fields'][f'field{i}'] = getattr(entry, f'field{i}')
             
             entries_list.append(entry_dict)
