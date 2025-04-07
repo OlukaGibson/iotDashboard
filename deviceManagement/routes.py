@@ -247,7 +247,7 @@ def get_firmware(firmwareVersion):
 """
 Device related routes for device management
 """
-# Define a route to add a new device
+# Add a new device
 @device_management.route('/adddevice', methods=['POST'])
 def add_device():
     # Extract fields from form data with default value None if not present
@@ -282,7 +282,7 @@ def add_device():
 
     return {'message': 'New device added successfully!'}
 
-# Define a route to retrieve all devices
+# Retrieve all devices
 @device_management.route('/get_devices', methods=['GET'])
 def get_devices():
     devices = db.session.query(Devices).all()
@@ -307,7 +307,7 @@ def get_devices():
     
     return jsonify(devices_list)
 
-# Define a route to retrieve a specific device
+# Retrieve a specific device
 @device_management.route('/get_device/<int:deviceID>', methods=['GET'])
 def get_device(deviceID):
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
