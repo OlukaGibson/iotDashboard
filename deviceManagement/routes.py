@@ -1,7 +1,7 @@
 from flask import Blueprint, redirect, url_for, render_template, request, send_file, jsonify
 import os
 from .extentions import db
-from .models import Devices, MetadataValues, Firmware, DeviceFiles, Profiles
+from .models import Devices, MetadataValues, Firmware, DeviceFiles, Profiles, ConfigValues
 from google.cloud import storage
 import io
 import json
@@ -9,6 +9,8 @@ from google.oauth2 import service_account
 from dotenv import load_dotenv
 from intelhex import IntelHex
 from datetime import datetime, timedelta
+import random
+import string
 
 
 load_dotenv()
@@ -39,7 +41,49 @@ def device_storage():
         'scheme': scheme
     }
 
+@device_management.route('/dashboard_summary', methods=['GET'])
+def dashboard_summary():
+    # Total number of devices
+    total_devices = db.session.query(Devices).count()
 
+    # Total number of profiles
+    total_profiles = db.session.query(Profiles).count()
+
+    # Total number of firmware versions
+    total_firmware_versions = db.session.query(Firmware).count()
+
+    # Latest firmware and its upload time
+    latest_firmware = db.session.query(Firmware).order_by(Firmware.created_at.desc()).first()
+    latest_firmware_info = {
+        'firmwareVersion': latest_firmware.firmwareVersion,
+        'uploaded_at': latest_firmware.created_at
+    } if latest_firmware else None
+
+    # Number of online and offline devices
+    online_devices = db.session.query(Devices).filter_by(fileDownloadState=True).count()
+    offline_devices = total_devices - online_devices
+
+    # Devices posting activity by hour
+    hourly_activity = []
+    for hour in range(24):
+        start_time = datetime.now().replace(hour=hour, minute=0, second=0, microsecond=0)
+        end_time = start_time + timedelta(hours=1)
+        devices_posted = db.session.query(MetadataValues.deviceID).filter(
+            MetadataValues.created_at >= start_time,
+            MetadataValues.created_at < end_time
+        ).distinct().count()
+        hourly_activity.append({'hour': hour, 'devices_posted': devices_posted})
+
+    # Return the summary
+    return jsonify({
+        'total_devices': total_devices,
+        'total_profiles': total_profiles,
+        'total_firmware_versions': total_firmware_versions,
+        'latest_firmware': latest_firmware_info,
+        'online_devices': online_devices,
+        'offline_devices': offline_devices,
+        'hourly_activity': hourly_activity
+    })
 
 """
 Firmware management related routes for firmware management
@@ -103,6 +147,7 @@ def firmware_upload():
         firmware_string=firmware_string,
         firmware_string_hex=firmware_string_hex,
         firmware_string_bootloader=firmware_string_bootloader,
+        firmware_type='beta',
         description=description,
         **changes
     )
@@ -211,6 +256,7 @@ def get_firmwares():
             'firmware_string': version.firmware_string,
             'firmware_string_hex': version.firmware_string_hex,
             'firmware_string_bootloader': version.firmware_string_bootloader,
+            'firmware_type': version.firmware_type,
             'description': version.description,
             'created_at': version.created_at,
             'changes': changes,
@@ -230,6 +276,7 @@ def get_firmware(firmwareVersion):
             'firmware_string_hex': firmware.firmware_string_hex,
             'firmware_string_bootloader': firmware.firmware_string_bootloader,
             'description': firmware.description,
+            'firmware_type': firmware.firmware_type,
             'created_at': firmware.created_at,
             'updated_at': firmware.updated_at,
             'changes': {
@@ -249,19 +296,25 @@ Device related routes for device management
 """
 # Add a new device
 @device_management.route('/adddevice', methods=['POST'])
+@device_management.route('/adddevice', methods=['POST'])
 def add_device():
-    # Extract fields from form data with default value None if not present
+    # Generate random 16-character alphanumeric strings for writekey and readkey
+    writekey = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
+    readkey = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
+
+    # Determine the next deviceID by finding the maximum existing deviceID and adding 1
+    last_device = db.session.query(Devices).order_by(Devices.deviceID.desc()).first()
+    deviceID = (last_device.deviceID + 1) if last_device else 1  # Start from 1 if no devices exist
+
+    # Extract other fields from form data with default value None if not present
     name = clean_data(request.form.get('name'))
-    readkey = clean_data(request.form.get('readkey'))
-    writekey = clean_data(request.form.get('writekey'))
-    deviceID = clean_data(request.form.get('deviceID'))
     networkID = clean_data(request.form.get('networkID'))
     currentFirmwareVersion = clean_data(request.form.get('currentFirmwareVersion'))
     previousFirmwareVersion = clean_data(request.form.get('previousFirmwareVersion'))
     targetFirmwareVersion = clean_data(request.form.get('targetFirmwareVersion'))
     profile = clean_data(request.form.get('profile'))
     fileDownloadState = request.form.get('fileDownloadState', 'False').lower() in ['true', '1', 't', 'y', 'yes']
-    
+
     # Create a new device object
     new_device = Devices(
         name=name,
@@ -280,14 +333,41 @@ def add_device():
     db.session.add(new_device)
     db.session.commit()
 
-    return {'message': 'New device added successfully!'}
+    return {
+        'message': 'New device added successfully!',
+        'deviceID': deviceID,
+        'readkey': readkey,
+        'writekey': writekey
+    }
 
 # Retrieve all devices
 @device_management.route('/get_devices', methods=['GET'])
 def get_devices():
     devices = db.session.query(Devices).all()
+    
     devices_list = []
     for device in devices:
+
+        currentFirmwareID = device.currentFirmwareVersion
+        previousFirmwareID = device.previousFirmwareVersion
+        targetFirmwareID = device.targetFirmwareVersion
+
+        currentFirmware = db.session.query(Firmware).filter_by(id=currentFirmwareID).first()   # currentFirmwareVersion
+        previousFirmware = db.session.query(Firmware).filter_by(id=previousFirmwareID).first() # previousFirmwareVersion
+        targetFirmware = db.session.query(Firmware).filter_by(id=targetFirmwareID).first()     # targetFirmwareVersion
+
+        currentFirmwareVersion = currentFirmware.firmwareVersion if currentFirmware else None
+        previousFirmwareVersion = previousFirmware.firmwareVersion if previousFirmware else None
+        targetFirmwareVersion = targetFirmware.firmwareVersion if targetFirmware else None
+
+        # Fetch the profile name
+        profile = db.session.query(Profiles).filter_by(id=device.profile).first()
+        profile_name = profile.name if profile else None
+
+        # Fetch the last time the device posted metadata
+        last_metadata_entry = db.session.query(MetadataValues).filter_by(deviceID=device.deviceID).order_by(MetadataValues.created_at.desc()).first()
+        last_posted_time = last_metadata_entry.created_at if last_metadata_entry else None
+
         device_dict = {
             'id': device.id,
             'name': device.name,
@@ -295,11 +375,13 @@ def get_devices():
             'writekey': device.writekey,
             'deviceID': device.deviceID,
             'networkID': device.networkID,
-            'currentFirmwareVersion': device.currentFirmwareVersion,
-            'previousFirmwareVersion': device.previousFirmwareVersion,
+            'currentFirmwareVersion': currentFirmwareVersion,
+            'previousFirmwareVersion': previousFirmwareVersion,
+            'targetFirmwareVersion': targetFirmwareVersion,
             'fileDownloadState': device.fileDownloadState,
-            'targetFirmwareVersion': device.targetFirmwareVersion,
             'profile': device.profile,
+            'profile_name': profile_name,
+            'last_posted_time': last_posted_time,  # Added last posted time
             'created_at': device.created_at
         }
         
@@ -350,7 +432,7 @@ def get_device(deviceID):
 
     # first 100 records of device data
     device_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
-    config_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
+    config_data = db.session.query(ConfigValues).filter_by(deviceID=deviceID).limit(100).all()
     device_data_list = []
     config_data_list = []
     for data in config_data:
@@ -478,13 +560,17 @@ def get_profiles():
     profiles = db.session.query(Profiles).all()
     profiles_list = []
     for profile in profiles:
+        # Count the number of devices associated with the profile
+        device_count = db.session.query(Devices).filter_by(profile=profile.id).count()
+
         profile_dict = {
             'id': profile.id,
             'name': profile.name,
             'description': profile.description,
             'created_at': profile.created_at,
             'fields': {},
-            'configs': {}
+            'configs': {},
+            'device_count': device_count  # Add the device count
         }
         for i in range(1, 16):
             if getattr(profile, f'field{i}'):
@@ -502,6 +588,8 @@ def get_profiles():
 @device_management.route('/get_profile/<int:profileID>', methods=['GET'])
 def get_profile(profileID):
     profile = db.session.query(Profiles).filter_by(id=profileID).first()
+    devices = db.session.query(Devices).filter_by(profile=profileID).all()
+
     if profile:
         profile_dict = {
             'id': profile.id,
@@ -509,7 +597,8 @@ def get_profile(profileID):
             'description': profile.description,
             'created_at': profile.created_at,
             'fields': {},
-            'configs': {}
+            'configs': {},
+            'devices': []
         }
         for i in range(1, 16):
             if getattr(profile, f'field{i}'):
@@ -518,7 +607,22 @@ def get_profile(profileID):
         for i in range(1, 11):
             if getattr(profile, f'config{i}'):
                 profile_dict['configs'][f'config{i}'] = getattr(profile, f'config{i}')
-        
+
+        # Add device details and most recent config values
+        for device in devices:
+            recent_config = db.session.query(ConfigValues).filter_by(deviceID=device.deviceID).order_by(ConfigValues.created_at.desc()).first()
+            config_values = {}
+            if recent_config:
+                for i in range(1, 11):
+                    if getattr(recent_config, f'config{i}', None):
+                        config_values[f'config{i}'] = getattr(recent_config, f'config{i}', None)
+
+            profile_dict['devices'].append({
+                'name': device.name,
+                'deviceID': device.deviceID,
+                'recent_config': config_values
+            })
+
         return jsonify(profile_dict)
     
     return {'message': 'Profile not found!'}, 404
@@ -529,25 +633,22 @@ Data related routes for data management
 """
 # Singular data update route
 @device_management.route('/update', methods=['GET'])
-def update_device_data(deviceID):
-    device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
-    
-    if not device:
-        return {'message': 'Device not found!'}, 404
-
-    # Retrieve the api_key from the query parameters
+def update_data():
     writekey = request.args.get('api_key')
     
-    # Check if the device exists and the provided writekey matches the device's writekey
-    if writekey != device.writekey:
+    device = db.session.query(Devices).filter_by(writekey=writekey).first()
+    
+    if not device:
         return {'message': 'Invalid API key!'}, 403
-
+    
     # Get the profile associated with the device
     profile = db.session.query(Profiles).filter_by(id=device.profile).first()
+
 
     field_label = {}
     for i in range(1, 16):
         field_label[f'field{i}'] = getattr(profile, f'field{i}', None)
+        
 
     # Updating data fields
     fields = {}
@@ -559,6 +660,7 @@ def update_device_data(deviceID):
 
     # Create a new entry in the MetadataValues table
     new_entry = MetadataValues(
+        created_at=datetime.now(),
         deviceID=device.deviceID,
         **fields
     )
@@ -566,29 +668,6 @@ def update_device_data(deviceID):
     # Add the new entry to the database and commit
     db.session.add(new_entry)
     db.session.commit()
-
-    if device.fileDownloadState:
-        firmwareID = device.targetFirmwareVersion
-        firmware = db.session.query(Firmware).filter_by(id=firmwareID).first()
-        firmwareVersion = firmware.firmwareVersion
-        
-        storage_client = storage.Client(credentials=credentials)
-        bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
-        blob = bucket.blob(f'{firmwareVersion}.bin')
-
-        file_data = blob.download_as_string()
-        file_buffer = io.BytesIO(file_data)
-        file_buffer.seek(0)
-
-        device.fileDownloadState = False
-        db.session.commit()
-
-        return send_file(
-            file_buffer,
-            as_attachment=True,
-            download_name=f'{firmwareVersion}.bin',
-            mimetype='application/octet-stream'
-        )
 
     return {'message': 'Device data updated successfully!'}, 200
 
@@ -631,13 +710,13 @@ def bulk_update(deviceID):
             db.session.commit()
             return {'message': 'success'}, 200
 
-        elif 'delta_t' in updates[0]:  # Corrected key from 'delta' to 'delta_t'
+        elif 'delta_t' in updates[0]:
             created_at = datetime.now()
             for update in updates:
                 if update == updates[0]:
                     created_at = datetime.now()
                 else:
-                    created_at = created_at - timedelta(seconds=update.get('delta_t'))  # Corrected key
+                    created_at = created_at - timedelta(seconds=update.get('delta_t'))
 
                 fields = {}
                 for i in range(1, 16):
@@ -658,6 +737,42 @@ def bulk_update(deviceID):
 
     except Exception as e:
         return {'message': 'Server error', 'error': str(e)}, 500
+
+#update config data by user
+@device_management.route('/update_config_data', methods=['POST'])
+def update_config_data():
+    deviceID = request.form.get('deviceID')
+    if not deviceID:
+        return {'message': 'Device ID is required!'}, 400
+    
+    device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+    if not device:
+        return {'message': 'Device not found!'}, 404
+
+    profile = db.session.query(Profiles).filter_by(id=device.profile).first()
+    if not profile:
+        return {'message': 'Profile not found for the device!'}, 404
+
+    configs = {}
+    for i in range(1, 11):
+        config_name = getattr(profile, f'config{i}', None)
+        if config_name:  # Only update if the configuration has a name in the profile
+            configs[f'config{i}'] = clean_data(request.form.get(f'config{i}', None))
+        else:
+            configs[f'config{i}'] = None
+
+
+    
+    new_entry = ConfigValues(
+        created_at=datetime.now(),
+        deviceID=deviceID,
+        **configs
+    )
+
+    db.session.add(new_entry)
+    db.session.commit()
+
+    return {'message': 'Device config data updated successfully!'}, 200
 
 # Define a route to retrieve device data
 def get_device_data(deviceID):
@@ -687,7 +802,33 @@ def get_device_data(deviceID):
     
     return {'message': 'Invalid API key!'}, 403
 
-
+#fetch config data by device
+@device_management.route('/device/<int:deviceID>/getconfig', methods=['GET'])
+def get_config_data(deviceID):
+    device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+    if not device:
+        return {'message': 'Device not found!'}, 404
+    
+    # Fetch the latest configuration data by ordering by created_at in descending order
+    config_data = db.session.query(ConfigValues).filter_by(deviceID=deviceID).order_by(ConfigValues.created_at.desc()).first()
+    
+    if not config_data:
+        return {'message': 'No config data found for this device!'}, 404
+    
+    configuration = {
+        "deviceID": device.deviceID,
+        "created_at": config_data.created_at,
+        "configs": {}
+    }
+    
+    # Populate the configuration fields
+    for i in range(1, 11):
+        config_value = getattr(config_data, f'config{i}', None)
+        if config_value is not None:
+            configuration["configs"][f'config{i}'] = config_value
+    
+    return jsonify(configuration)
+    
 """"
 Profile related routes for profile management
 """    

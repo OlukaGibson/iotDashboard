@@ -1,4 +1,5 @@
 from .extentions import db
+from sqlalchemy import Enum
 
 class Firmware(db.Model):
     __tablename__ = 'firmware'
@@ -7,6 +8,7 @@ class Firmware(db.Model):
     firmware_string = db.Column(db.String(100), nullable=False)
     firmware_string_hex = db.Column(db.String(100), default=None, nullable=True)
     firmware_string_bootloader = db.Column(db.String(100), default=None, nullable=True)
+    firmware_type = db.Column(Enum('stable', 'beta', 'deprecated', 'legacy', name='firmware_type_enum'), nullable=True, default='beta')
     description = db.Column(db.String(100), default=None, nullable=True)
     # documentation = db.Column(db.String(100), default=None)
     # documentationLink = db.Column(db.String(100), default=None)
@@ -24,11 +26,12 @@ class Firmware(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
-    def __init__(self, firmwareVersion,firmware_string, firmware_string_hex, firmware_string_bootloader, description, change1, change2, change3, change4, change5, change6, change7, change8, change9, change10):
+    def __init__(self, firmwareVersion,firmware_string, firmware_string_hex, firmware_string_bootloader, firmware_type, description, change1, change2, change3, change4, change5, change6, change7, change8, change9, change10):
         self.firmwareVersion = firmwareVersion
         self.firmware_string = firmware_string
         self.firmware_string_hex = firmware_string_hex
         self.firmware_string_bootloader = firmware_string_bootloader
+        self.firmware_type = firmware_type
         self.description = description
         # self.documentation = documentation
         # self.documentationLink = documentationLink
