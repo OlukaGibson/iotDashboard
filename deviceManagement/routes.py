@@ -95,10 +95,11 @@ def firmware_upload():
     firmware_bootloader = request.files.get('firmware_bootloader', None)
     firmwareVersion = request.form.get('firmwareVersion')
     description = clean_data(request.form.get('description', None))
+    firmware_type = request.form.get('firmware_type', 'beta')  # Default to 'beta' if not specified
 
-    # Read the file as a string (assuming it's a text-based hex file)
-    firmware_content = firmware.read().decode('utf-8')
-    firmware_bootloader_content = firmware_bootloader.read().decode('utf-8') if firmware_bootloader else None
+    # Read the file as binary data - don't decode
+    firmware_content = firmware.read()
+    firmware_bootloader_content = firmware_bootloader.read() if firmware_bootloader else None
 
     changes = {}
     for i in range(1, 11):
@@ -106,50 +107,44 @@ def firmware_upload():
 
     # uploading firmware to google cloud storage
     if firmware.filename.endswith('.hex'):
-        firmware_hex = IntelHex(io.StringIO(firmware_content))
+        # For hex files, parse them using IntelHex
+        firmware_hex = IntelHex(io.BytesIO(firmware_content))
         bin_data = io.BytesIO()
         firmware_hex.tobinfile(bin_data)
         bin_data.seek(0)
-
+        
         storage_client = storage.Client(credentials=credentials)
         bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
 
-        # bin file storage
+        # Store binary version
         blob = bucket.blob(f'firmware/firmware_file_bin/{firmwareVersion}.bin')
-        blob.upload_from_file(bin_data, content_type='application/octet-stream')
-        firmware_string = f'firmware/firmware_file_bin/{firmwareVersion}.bin'
-
-        # hex file storage
-        blob_hex = bucket.blob(f'firmware/firmware_file_hex/{firmwareVersion}.hex')
-        blob_hex.upload_from_string(firmware_content, content_type='text/plain')
-        firmware_string_hex = f'firmware/firmware_file_hex/{firmwareVersion}.hex'
-
-        # bootloader file storage
-        if firmware_bootloader:
-            blob_bootloader = bucket.blob(f'firmware/firmware_file_bootloader/{firmwareVersion}_bootloader.hex')
-            blob_bootloader.upload_from_string(firmware_bootloader_content, content_type='text/plain')
-            firmware_string_bootloader = f'firmware/firmware_file_bootloader/{firmwareVersion}_bootloader.hex'
-        else:
-            firmware_string_bootloader = None
-
+        blob.upload_from_file(bin_data)
+        
+        # Store hex version
+        blob = bucket.blob(f'firmware/firmware_file_hex/{firmwareVersion}.hex')
+        blob.upload_from_string(firmware_content)
     else:
+        # For binary files, store them directly
         storage_client = storage.Client(credentials=credentials)
         bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
-        blob = bucket.blob(f'firmware/firmware_file/{firmwareVersion}{os.path.splitext(firmware.filename)[1]}')
-        blob.upload_from_file(firmware, content_type=firmware.content_type)
-        firmware_string = f'firmware/firmware_file/{firmwareVersion}{os.path.splitext(firmware.filename)[1]}'
-        firmware_string_hex = None
-        firmware_string_bootloader = None
+        
+        blob = bucket.blob(f'firmware/firmware_file_bin/{firmwareVersion}.bin')
+        blob.upload_from_string(firmware_content)
 
-    # Add firmware to database
+    # Store bootloader if provided
+    if firmware_bootloader:
+        blob = bucket.blob(f'firmware/firmware_file_bootloader/{firmwareVersion}.hex')
+        blob.upload_from_string(firmware_bootloader_content)
+
+    # Create a new firmware record in the database
     new_firmware = Firmware(
         firmwareVersion=firmwareVersion,
-        firmware_string=firmware_string,
-        firmware_string_hex=firmware_string_hex,
-        firmware_string_bootloader=firmware_string_bootloader,
-        firmware_type='beta',
+        firmware_string=f'firmware/firmware_file_bin/{firmwareVersion}.bin',
+        firmware_string_hex=f'firmware/firmware_file_hex/{firmwareVersion}.hex' if firmware.filename.endswith('.hex') else None,
+        firmware_string_bootloader=f'firmware/firmware_file_bootloader/{firmwareVersion}.hex' if firmware_bootloader else None,
+        firmware_type=firmware_type,
         description=description,
-        **changes
+        **changes,
     )
 
     db.session.add(new_firmware)
@@ -295,7 +290,6 @@ def get_firmware(firmwareVersion):
 Device related routes for device management
 """
 # Add a new device
-@device_management.route('/adddevice', methods=['POST'])
 @device_management.route('/adddevice', methods=['POST'])
 def add_device():
     # Generate random 16-character alphanumeric strings for writekey and readkey
