@@ -107,9 +107,20 @@ def firmware_upload():
 
     # uploading firmware to google cloud storage
     if firmware.filename.endswith('.hex'):
-        # For hex files, parse them using IntelHex
-        firmware_hex = IntelHex(io.BytesIO(firmware_content))
+        # For hex files, properly decode content as UTF-8 or ASCII for IntelHex
+        try:
+            # Try UTF-8 first
+            firmware_content_str = firmware_content.decode('utf-8')
+        except UnicodeDecodeError:
+            # Fall back to ASCII if UTF-8 fails
+            firmware_content_str = firmware_content.decode('ascii', errors='ignore')
+        
+        # Create a BytesIO for the binary output
         bin_data = io.BytesIO()
+        
+        # Create IntelHex from the string content
+        firmware_hex = IntelHex()
+        firmware_hex.loadhex(io.StringIO(firmware_content_str))
         firmware_hex.tobinfile(bin_data)
         bin_data.seek(0)
         
