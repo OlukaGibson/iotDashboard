@@ -835,12 +835,28 @@ def self_config(networkID):
         return {'message': 'Device not found!'}, 404
 
     try:
+        # Get the associated profile
+        profile = db.session.query(Profiles).filter_by(id=device.profile).first()
+        
+        # Get the latest config values
+        latest_config = db.session.query(ConfigValues).filter_by(deviceID=device.deviceID).order_by(ConfigValues.created_at.desc()).first()
+        
+        # Prepare device basic details
         device_details = {
             'name': device.name,
             'deviceID': device.deviceID,
             'networkID': device.networkID,
-            'writekey': device.writekey
+            'writekey': device.writekey,
+            'configs': {}
         }
+        
+        # Add profile configurations and their values
+        if profile and latest_config:
+            for i in range(1, 11):
+                config_name = getattr(profile, f'config{i}')
+                if config_name:  # Only include configs that are defined in the profile
+                    config_value = getattr(latest_config, f'config{i}')
+                    device_details['configs'][config_name] = config_value
 
         return jsonify(device_details)
 
