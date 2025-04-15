@@ -3,7 +3,7 @@ import random
 import string
 from datetime import datetime, timedelta
 from ..extentions import db
-from ..models import Devices, Firmware, Profiles, MetadataValues, ConfigValues
+from ..models import Devices, Firmware, Profiles, MetadataValues, ConfigValues, DeviceData
 from . import device_management, clean_data
 
 
@@ -38,7 +38,19 @@ def dashboard_summary():
     } if latest_firmware else None
 
     # Number of online and offline devices
-    online_devices = db.session.query(Devices).filter_by(fileDownloadState=True).count()
+    # Online devices are those that have posted data in the last 3 hours
+    three_hours_ago = datetime.now() - timedelta(hours=3)
+    
+    # Get distinct device IDs that have posted data in the last 3 hours
+    online_device_ids = db.session.query(DeviceData.deviceID).filter(
+        DeviceData.created_at >= three_hours_ago
+    ).distinct().all()
+    
+    # Convert the result to a list of IDs
+    online_device_ids = [device_id[0] for device_id in online_device_ids]
+    
+    # Count the number of online devices
+    online_devices = len(online_device_ids)
     offline_devices = total_devices - online_devices
 
     # Devices posting activity by hour
@@ -46,9 +58,9 @@ def dashboard_summary():
     for hour in range(24):
         start_time = datetime.now().replace(hour=hour, minute=0, second=0, microsecond=0)
         end_time = start_time + timedelta(hours=1)
-        devices_posted = db.session.query(MetadataValues.deviceID).filter(
-            MetadataValues.created_at >= start_time,
-            MetadataValues.created_at < end_time
+        devices_posted = db.session.query(DeviceData.deviceID).filter(
+            DeviceData.created_at >= start_time,
+            DeviceData.created_at < end_time
         ).distinct().count()
         hourly_activity.append({'hour': hour, 'devices_posted': devices_posted})
 

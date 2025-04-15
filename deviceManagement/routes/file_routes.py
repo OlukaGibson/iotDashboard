@@ -1,6 +1,6 @@
 from flask import request, jsonify
 from ..extentions import db
-from ..models import Profiles, Devices, ConfigValues, DeviceFiles
+from ..models import Profiles, Devices, DeviceFiles
 from . import device_management, clean_data, credentials
 from google.cloud import storage
 import os

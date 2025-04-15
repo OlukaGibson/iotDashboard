@@ -13,9 +13,11 @@ def add_profile():
     description = clean_data(request.form.get('description', None))
 
     fields = {}
+    metadata = {}
     for i in range(1, 16):
         fields[f'field{i}'] = clean_data(request.form.get(f'field{i}', None))
-    
+        metadata[f'metadata{i}'] = clean_data(request.form.get(f'metadata{i}', None))
+
     configs = {}
     for i in range(1, 11):
         configs[f'config{i}'] = clean_data(request.form.get(f'config{i}', None))
@@ -24,7 +26,8 @@ def add_profile():
         name=name,
         description=description,
         **fields,
-        **configs
+        **configs,
+        **metadata,
     )
 
     db.session.add(new_profile)
@@ -48,11 +51,15 @@ def get_profiles():
             'created_at': profile.created_at,
             'fields': {},
             'configs': {},
-            'device_count': device_count  # Add the device count
+            'metadata': {},
+            'device_count': device_count
         }
         for i in range(1, 16):
             if getattr(profile, f'field{i}'):
                 profile_dict['fields'][f'field{i}'] = getattr(profile, f'field{i}')
+            
+            if getattr(profile, f'metadata{i}'):
+                profile_dict['metadata'][f'metadata{i}'] = getattr(profile, f'metadata{i}')
 
         for i in range(1, 11):
             if getattr(profile, f'config{i}'):
@@ -76,11 +83,14 @@ def get_profile(profileID):
             'created_at': profile.created_at,
             'fields': {},
             'configs': {},
+            'metadata': {},
             'devices': []
         }
         for i in range(1, 16):
             if getattr(profile, f'field{i}'):
                 profile_dict['fields'][f'field{i}'] = getattr(profile, f'field{i}')
+            if getattr(profile, f'metadata{i}'):
+                profile_dict['metadata'][f'metadata{i}'] = getattr(profile, f'metadata{i}')
 
         for i in range(1, 11):
             if getattr(profile, f'config{i}'):

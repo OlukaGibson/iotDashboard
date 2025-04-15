@@ -3,7 +3,7 @@ import random
 import string
 from datetime import datetime
 from ..extentions import db
-from ..models import Devices, Firmware, Profiles, MetadataValues, ConfigValues
+from ..models import Devices, Firmware, Profiles, MetadataValues, ConfigValues, DeviceData
 from . import device_management, clean_data
 
 """
@@ -79,7 +79,7 @@ def get_devices():
         profile_name = profile.name if profile else None
 
         # Fetch the last time the device posted metadata
-        last_metadata_entry = db.session.query(MetadataValues).filter_by(deviceID=device.deviceID).order_by(MetadataValues.created_at.desc()).first()
+        last_metadata_entry = db.session.query(DeviceData).filter_by(deviceID=device.deviceID).order_by(DeviceData.created_at.desc()).first()
         last_posted_time = last_metadata_entry.created_at if last_metadata_entry else None
 
         device_dict = {
@@ -95,7 +95,7 @@ def get_devices():
             'fileDownloadState': device.fileDownloadState,
             'profile': device.profile,
             'profile_name': profile_name,
-            'last_posted_time': last_posted_time,  # Added last posted time
+            'last_posted_time': last_posted_time,
             'created_at': device.created_at
         }
         
@@ -107,6 +107,9 @@ def get_devices():
 @device_management.route('/get_device/<int:deviceID>', methods=['GET'])
 def get_device(deviceID):
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+
+    if not device:
+        return {'message': 'Device not found!'}, 404
 
     currentFirmwareID = device.currentFirmwareVersion
     previousFirmwareID = device.previousFirmwareVersion
@@ -120,9 +123,6 @@ def get_device(deviceID):
     previousFirmwareVersion = previousFirmware.firmwareVersion if previousFirmware else None
     targetFirmwareVersion = targetFirmware.firmwareVersion if targetFirmware else None
 
-    if not device:
-        return {'message': 'Device not found!'}, 404
-
     deviceProfile = db.session.query(Profiles).filter_by(id=device.profile).first()
     
     if deviceProfile:
@@ -132,11 +132,14 @@ def get_device(deviceID):
             'description': deviceProfile.description,
             'created_at': deviceProfile.created_at,
             'fields': {},
-            'configs': {}
+            'configs': {},
+            'metadata': {}  # Add the missing 'metadata' key
         }
         for i in range(1, 16):
             if getattr(deviceProfile, f'field{i}') is not None:
                 profile_dict['fields'][f'field{i}'] = getattr(deviceProfile, f'field{i}')
+            if getattr(deviceProfile, f'metadata{i}') is not None:
+                profile_dict['metadata'][f'metadata{i}'] = getattr(deviceProfile, f'metadata{i}')
         
         for i in range(1, 11):
             if getattr(deviceProfile, f'config{i}') is not None:
@@ -145,10 +148,22 @@ def get_device(deviceID):
         profile_dict = None
 
     # first 100 records of device data
-    device_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
+    device_data = db.session.query(DeviceData).filter_by(deviceID=deviceID).limit(100).all()
     config_data = db.session.query(ConfigValues).filter_by(deviceID=deviceID).limit(100).all()
+    meta_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
     device_data_list = []
     config_data_list = []
+    meta_data_list = []
+    for data in meta_data:
+        data_dict = {
+            'entryID': data.id,
+            'created_at': data.created_at,
+        }
+        for i in range(1, 16):
+            if getattr(data, f'field{i}', None):
+                data_dict[f'field{i}'] = getattr(data, f'field{i}', None)
+        meta_data_list.append(data_dict)
+
     for data in config_data:
         data_dict = {
             'entryID': data.id,
@@ -184,6 +199,7 @@ def get_device(deviceID):
         'fileDownloadState': device.fileDownloadState,
         'device_data': device_data_list,
         'config_data': config_data_list,
+        'meta_data': meta_data_list,
         'profile': profile_dict
     }
     

@@ -66,6 +66,21 @@ class Profiles(db.Model):
     field13 = db.Column(db.String(100), default=None)
     field14 = db.Column(db.String(100), default=None)
     field15 = db.Column(db.String(100), default=None)
+    metadata1 = db.Column(db.String(100), default=None)
+    metadata2 = db.Column(db.String(100), default=None)
+    metadata3 = db.Column(db.String(100), default=None)
+    metadata4 = db.Column(db.String(100), default=None)
+    metadata5 = db.Column(db.String(100), default=None)
+    metadata6 = db.Column(db.String(100), default=None)
+    metadata7 = db.Column(db.String(100), default=None)
+    metadata8 = db.Column(db.String(100), default=None)
+    metadata9 = db.Column(db.String(100), default=None)
+    metadata10 = db.Column(db.String(100), default=None)
+    metadata11 = db.Column(db.String(100), default=None)
+    metadata12 = db.Column(db.String(100), default=None)
+    metadata13 = db.Column(db.String(100), default=None)
+    metadata14 = db.Column(db.String(100), default=None)
+    metadata15 = db.Column(db.String(100), default=None)
     config1 = db.Column(db.String(100), default=None)
     config2 = db.Column(db.String(100), default=None)
     config3 = db.Column(db.String(100), default=None)
@@ -78,7 +93,7 @@ class Profiles(db.Model):
     config10 = db.Column(db.String(100), default=None)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
-    def __init__(self, name, description, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, config1, config2, config3, config4, config5, config6, config7, config8, config9, config10):
+    def __init__(self, name, description, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, config1, config2, config3, config4, config5, config6, config7, config8, config9, config10, metadata1, metadata2, metadata3, metadata4, metadata5, metadata6, metadata7, metadata8, metadata9, metadata10, metadata11, metadata12, metadata13, metadata14, metadata15):
         self.name = name
         self.description = description
         self.field1 = field1
@@ -96,6 +111,21 @@ class Profiles(db.Model):
         self.field13 = field13
         self.field14 = field14
         self.field15 = field15
+        self.metadata1 = metadata1
+        self.metadata2 = metadata2
+        self.metadata3 = metadata3
+        self.metadata4 = metadata4
+        self.metadata5 = metadata5
+        self.metadata6 = metadata6
+        self.metadata7 = metadata7
+        self.metadata8 = metadata8
+        self.metadata9 = metadata9
+        self.metadata10 = metadata10
+        self.metadata11 = metadata11
+        self.metadata12 = metadata12
+        self.metadata13 = metadata13
+        self.metadata14 = metadata14
+        self.metadata15 = metadata15
         self.config1 = config1
         self.config2 = config2
         self.config3 = config3
@@ -134,9 +164,10 @@ class Devices(db.Model):
         self.targetFirmwareVersion = targetFirmwareVersion
         self.fileDownloadState = fileDownloadState
 
-class MetadataValues(db.Model):
-    __tablename__ = 'metadatavalues'
+class DeviceData(db.Model):
+    __tablename__ = 'devicedata'
     id = db.Column(db.Integer, primary_key=True)
+    entryID = db.Column(db.Integer)
     deviceID = db.Column(db.Integer, db.ForeignKey('devices.deviceID'))
     created_at = db.Column(db.DateTime)  # Removed server_default
     field1 = db.Column(db.String(100), default=None)
@@ -155,9 +186,18 @@ class MetadataValues(db.Model):
     field14 = db.Column(db.String(100), default=None)
     field15 = db.Column(db.String(100), default=None)
 
-    def __init__(self, created_at, deviceID, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15):
+    __table_args__ = (db.UniqueConstraint('deviceID', 'entryID', name='unique_device_entry'),)
+
+    @classmethod
+    def get_next_entry_id(cls, device_id):
+        """Get the next available entry ID for a specific device."""
+        max_entry = db.session.query(db.func.max(cls.entryID)).filter(cls.deviceID == device_id).scalar()
+        return 1 if max_entry is None else max_entry + 1
+
+    def __init__(self, created_at, deviceID, entryID, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15):
         self.created_at = created_at
         self.deviceID = deviceID
+        self.entryID = entryID
         self.field1 = field1
         self.field2 = field2
         self.field3 = field3
@@ -173,6 +213,46 @@ class MetadataValues(db.Model):
         self.field13 = field13
         self.field14 = field14
         self.field15 = field15
+
+class MetadataValues(db.Model):
+    __tablename__ = 'metadatavalues'
+    id = db.Column(db.Integer, primary_key=True)
+    deviceID = db.Column(db.Integer, db.ForeignKey('devices.deviceID'))
+    created_at = db.Column(db.DateTime)
+    metadata1 = db.Column(db.String(100), default=None)
+    metadata2 = db.Column(db.String(100), default=None)
+    metadata3 = db.Column(db.String(100), default=None)
+    metadata4 = db.Column(db.String(100), default=None)
+    metadata5 = db.Column(db.String(100), default=None)
+    metadata6 = db.Column(db.String(100), default=None)
+    metadata7 = db.Column(db.String(100), default=None)
+    metadata8 = db.Column(db.String(100), default=None)
+    metadata9 = db.Column(db.String(100), default=None)
+    metadata10 = db.Column(db.String(100), default=None)
+    metadata11 = db.Column(db.String(100), default=None)
+    metadata12 = db.Column(db.String(100), default=None)
+    metadata13 = db.Column(db.String(100), default=None)
+    metadata14 = db.Column(db.String(100), default=None)
+    metadata15 = db.Column(db.String(100), default=None)
+
+    def __init__(self, created_at, deviceID, metadata1, metadata2, metadata3, metadata4, metadata5, metadata6, metadata7, metadata8, metadata9, metadata10, metadata11, metadata12, metadata13, metadata14, metadata15):
+        self.created_at = created_at
+        self.deviceID = deviceID
+        self.metadata1 = metadata1
+        self.metadata2 = metadata2
+        self.metadata3 = metadata3
+        self.metadata4 = metadata4
+        self.metadata5 = metadata5
+        self.metadata6 = metadata6
+        self.metadata7 = metadata7
+        self.metadata8 = metadata8
+        self.metadata9 =  metadata9
+        self.metadata10 = metadata10
+        self.metadata11 = metadata11
+        self.metadata12 = metadata12
+        self.metadata13 = metadata13
+        self.metadata14 = metadata14
+        self.metadata15 = metadata15
 
 class ConfigValues(db.Model):
     __tablename__ = 'configvalues'

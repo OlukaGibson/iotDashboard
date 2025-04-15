@@ -1,15 +1,15 @@
 from flask import request, jsonify
 from ..extentions import db
-from ..models import Profiles, Devices, ConfigValues, MetadataValues
+from ..models import Profiles, Devices, ConfigValues, MetadataValues,DeviceData
 from datetime import datetime, timedelta
 from . import device_management, clean_data
 
 """
-Data related routes for data management
+Device data related routes for data management
 """
-# Singular data update route
+# Data updates from devices
 @device_management.route('/update', methods=['GET'])
-def update_data():
+def update_device_data():
     writekey = request.args.get('api_key')
     
     device = db.session.query(Devices).filter_by(writekey=writekey).first()
@@ -34,10 +34,12 @@ def update_data():
         else:
             fields[f'field{i}'] = None
 
-    # Create a new entry in the MetadataValues table
-    new_entry = MetadataValues(
+    # Create a new entry in the DeviceData table
+    # Create a new entry in the DeviceData table
+    new_entry = DeviceData(
         created_at=datetime.now(),
         deviceID=device.deviceID,
+        entryID=DeviceData.get_next_entry_id(device.deviceID),
         **fields
     )
 
@@ -76,9 +78,10 @@ def bulk_update(deviceID):
                 for i in range(1, 16):
                     fields[f'field{i}'] = update.get(f'field{i}', None)
 
-                new_entry = MetadataValues(
+                new_entry = DeviceData(
                     deviceID=device.deviceID,
                     created_at=created_at,
+                    entryID=DeviceData.get_next_entry_id(device.deviceID),
                     **fields
                 )
                 db.session.add(new_entry)
@@ -98,9 +101,10 @@ def bulk_update(deviceID):
                 for i in range(1, 16):
                     fields[f'field{i}'] = update.get(f'field{i}', None)
 
-                new_entry = MetadataValues(
+                new_entry = DeviceData(
                     deviceID=device.deviceID,
                     created_at=created_at,
+                    entryID=DeviceData.get_next_entry_id(device.deviceID),
                     **fields
                 )
                 db.session.add(new_entry)
@@ -114,6 +118,52 @@ def bulk_update(deviceID):
     except Exception as e:
         return {'message': 'Server error', 'error': str(e)}, 500
 
+"""
+Metadata related routes
+"""
+# meta dataupdate from devices
+@device_management.route('/metadataupdate', methods=['GET'])
+def update_meta_data():
+    writekey = request.args.get('api_key')
+    
+    device = db.session.query(Devices).filter_by(writekey=writekey).first()
+    
+    if not device:
+        return {'message': 'Invalid API key!'}, 403
+    
+    # Get the profile associated with the device
+    profile = db.session.query(Profiles).filter_by(id=device.profile).first()
+
+
+    metadata_label = {}
+    for i in range(1, 16):
+        metadata_label[f'metadata{i}'] = getattr(profile, f'metadata{i}', None)
+        
+
+    # Updating data metadata
+    metadatas = {}
+    for i in range(1, 16):
+        if metadata_label[f'metadata{i}']:
+            metadatas[f'metadata{i}'] = clean_data(request.args.get(f'metadata{i}', None))
+        else:
+            metadatas[f'metadata{i}'] = None
+
+    # Create a new entry in the MetadataValues table
+    new_entry = MetadataValues(
+        created_at=datetime.now(),
+        deviceID=device.deviceID,
+        **metadatas
+    )
+
+    # Add the new entry to the database and commit
+    db.session.add(new_entry)
+    db.session.commit()
+
+    return {'message': 'Device data updated successfully!'}, 200
+
+"""
+Config data  related routes
+"""
 #update config data by user
 @device_management.route('/update_config_data', methods=['POST'])
 def update_config_data():
@@ -149,6 +199,14 @@ def update_config_data():
     db.session.commit()
 
     return {'message': 'Device config data updated successfully!'}, 200
+
+
+
+
+
+
+
+
 
 # Define a route to retrieve device data
 def get_device_data(deviceID):

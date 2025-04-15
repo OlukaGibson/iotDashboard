@@ -20,9 +20,9 @@ def clean_data(data):
     return None if data == "" else data
 
 # Import all routes
-from .dashboard_routes import *
-from .device_routes import * 
-from .data_routes import *
 from .profile_routes import *
-from .file_routes import *
 from .firmware_routes import *
+from .device_routes import * 
+from .dashboard_routes import *
+from .data_routes import *
+from .file_routes import *
