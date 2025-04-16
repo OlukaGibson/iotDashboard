@@ -160,8 +160,8 @@ def get_device(deviceID):
             'created_at': data.created_at,
         }
         for i in range(1, 16):
-            if getattr(data, f'field{i}', None):
-                data_dict[f'field{i}'] = getattr(data, f'field{i}', None)
+            if getattr(data, f'metadata{i}', None):
+                data_dict[f'metadata{i}'] = getattr(data, f'metadata{i}', None)
         meta_data_list.append(data_dict)
 
     for data in config_data:
