@@ -1,4 +1,4 @@
-from flask import request, jsonify, send_file
+from flask import Flask, Response, request, jsonify, send_file
 import os
 import io
 from intelhex import IntelHex
@@ -6,6 +6,7 @@ from ..extentions import db
 from ..models import Firmware
 from google.cloud import storage
 from . import device_management, clean_data, credentials
+
 
 """
 Firmware management related routes for firmware management
@@ -86,34 +87,67 @@ def firmware_upload():
     return {'message': 'Firmware uploaded successfully!'}
 
 # Define a route to download firmware bin file
-@device_management.route('/firmware/<string:firmwareVersion>/download/firwmwarebin', methods=['GET'])
+from flask import Response, request
+import io
+
+@device_management.route('/firmware/<string:firmwareVersion>/download/firmwarebin', methods=['GET'])
 def firmware_download(firmwareVersion):
     firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
-    
+
     if firmware:
         firmware_string = firmware.firmware_string
         if not firmware_string:
             return {'message': 'Firmware bin file not found!'}, 404
-        
+
+        # Fetch binary file from Google Cloud Storage
         storage_client = storage.Client(credentials=credentials)
         bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
         blob = bucket.blob(firmware_string)
+        blob.reload()
+        
+        file_size = blob.size
+        range_header = request.headers.get('Range', None)
 
-        file_data = blob.download_as_string()
-        file_buffer = io.BytesIO(file_data)
-        file_buffer.seek(0)
+        if range_header:
+            byte_range = range_header.strip().split('=')[-1]
+            if '-' not in byte_range:
+                return {'message': 'Invalid Range header'}, 400
 
-        return send_file(
-            file_buffer,
-            as_attachment=True,
-            download_name=f'{firmwareVersion}.bin',
-            mimetype='application/octet-stream'
+            parts = byte_range.split('-')
+            start = int(parts[0]) if parts[0] else 0
+            end = int(parts[1]) if len(parts) > 1 and parts[1] else file_size - 1
+            length = end - start + 1
+
+            partial_data = blob.download_as_bytes(start=start, end=end + 1)  # GCS exclusive end
+
+            response = Response(partial_data,
+                                206,
+                                mimetype='application/octet-stream',
+                                direct_passthrough=True)
+            response.headers.add('Content-Range', f'bytes {start}-{end}/{file_size}')
+            response.headers.add('Accept-Ranges', 'bytes')
+            # response.headers.add('Content-Length', str(length))
+            return response
+
+
+        # No Range header: send full file
+        file_data = blob.download_as_bytes()
+        return Response(
+            file_data,
+            200,
+            mimetype='application/octet-stream',
+            headers={
+                'Content-Disposition': f'attachment; filename={firmwareVersion}.bin',
+                'Content-Length': str(file_size),
+                'Accept-Ranges': 'bytes'
+            }
         )
-    
+
     return {'message': 'Firmware version not found!'}, 404
 
+
 # Define a route to download firmware hex file
-@device_management.route('/firmware/<string:firmwareVersion>/download/firwmwarehex', methods=['GET'])
+@device_management.route('/firmware/<string:firmwareVersion>/download/firmwarehex', methods=['GET'])
 def firmware_download_hex(firmwareVersion):
     firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
 
@@ -140,7 +174,7 @@ def firmware_download_hex(firmwareVersion):
     return {'message': 'Firmware version not found!'}, 404
 
 # Define a route to download firmware bootloader file
-@device_management.route('/firmware/<string:firmwareVersion>/download/firwmwarebootloader', methods=['GET'])
+@device_management.route('/firmware/<string:firmwareVersion>/download/firmwarebootloader', methods=['GET'])
 def firmware_download_bootloader(firmwareVersion):
     firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
 
@@ -169,9 +203,54 @@ def firmware_download_bootloader(firmwareVersion):
 # Define a route to retrieve all firmware versions
 @device_management.route('/firmware/display', methods=['GET'])
 def get_firmwares():
+    from ..models import Devices  # Import Devices model to count devices
+    import logging
+    
     firmwares = db.session.query(Firmware).all()
+    storage_client = storage.Client(credentials=credentials)
+    bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
+    
     firmwares_list = []
     for version in firmwares:
+        # Count devices using this firmware version as their current firmware
+        current_devices_count = db.session.query(Devices).filter_by(
+            currentFirmwareVersion=version.id
+        ).count()
+        
+        # Get file sizes
+        bin_size = hex_size = bootloader_size = None
+        
+        # Get binary file size
+        if version.firmware_string:
+            try:
+                blob = bucket.blob(version.firmware_string)
+                # Get metadata directly instead of checking exists first
+                blob.reload()
+                bin_size = blob.size
+            except Exception as e:
+                print(f"Error getting bin file size for {version.firmware_string}: {str(e)}")
+        
+        # Get hex file size
+        if version.firmware_string_hex:
+            try:
+                blob = bucket.blob(version.firmware_string_hex)
+                # Get metadata directly instead of checking exists first
+                blob.reload()
+                hex_size = blob.size
+            except Exception as e:
+                print(f"Error getting hex file size for {version.firmware_string_hex}: {str(e)}")
+        
+        # Get bootloader file size
+        if version.firmware_string_bootloader:
+            try:
+                blob = bucket.blob(version.firmware_string_bootloader)
+                # Get metadata directly instead of checking exists first
+                blob.reload()
+                bootloader_size = blob.size
+            except Exception as e:
+                print(f"Error getting bootloader file size for {version.firmware_string_bootloader}: {str(e)}")
+                
+        # Collect changes
         changes = {}
         for i in range(1, 11):
             change_value = getattr(version, f'change{i}')
@@ -187,8 +266,14 @@ def get_firmwares():
             'firmware_type': version.firmware_type,
             'description': version.description,
             'created_at': version.created_at,
+            'updated_at': version.updated_at,
             'changes': changes,
-            'updated_at': version.updated_at
+            'devices_count': current_devices_count,
+            'file_sizes': {
+                'bin': bin_size,
+                'hex': hex_size,
+                'bootloader': bootloader_size
+            }
         })
     
     return jsonify(firmwares_list)
