@@ -71,8 +71,8 @@ def get_devices():
         targetFirmware = db.session.query(Firmware).filter_by(id=targetFirmwareID).first()     # targetFirmwareVersion
 
         currentFirmwareVersion = currentFirmware.firmwareVersion if currentFirmware else None
-        previousFirmwareVersion = previousFirmware.firmwareVersion if previousFirmware else None
-        targetFirmwareVersion = targetFirmware.firmwareVersion if targetFirmware else None
+        previousFirmwareVersion = previousFirmware.firmwareVersion if previousFirmware else currentFirmwareVersion
+        targetFirmwareVersion = targetFirmware.firmwareVersion if targetFirmware else currentFirmwareVersion
 
         # Fetch the profile name
         profile = db.session.query(Profiles).filter_by(id=device.profile).first()
@@ -96,7 +96,8 @@ def get_devices():
             'profile': device.profile,
             'profile_name': profile_name,
             'last_posted_time': last_posted_time,
-            'created_at': device.created_at
+            'created_at': device.created_at,
+            'firmwareDownloadState': device.firmwareDownloadState,
         }
         
         devices_list.append(device_dict)

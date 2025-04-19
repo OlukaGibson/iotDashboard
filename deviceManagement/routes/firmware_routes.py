@@ -3,9 +3,10 @@ import os
 import io
 from intelhex import IntelHex
 from ..extentions import db
-from ..models import Firmware
+from ..models import Firmware, Devices
 from google.cloud import storage
 from . import device_management, clean_data, credentials
+import logging
 
 
 """
@@ -87,9 +88,6 @@ def firmware_upload():
     return {'message': 'Firmware uploaded successfully!'}
 
 # Define a route to download firmware bin file
-from flask import Response, request
-import io
-
 @device_management.route('/firmware/<string:firmwareVersion>/download/firmwarebin', methods=['GET'])
 def firmware_download(firmwareVersion):
     firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
@@ -203,9 +201,6 @@ def firmware_download_bootloader(firmwareVersion):
 # Define a route to retrieve all firmware versions
 @device_management.route('/firmware/display', methods=['GET'])
 def get_firmwares():
-    from ..models import Devices  # Import Devices model to count devices
-    import logging
-    
     firmwares = db.session.query(Firmware).all()
     storage_client = storage.Client(credentials=credentials)
     bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
@@ -302,3 +297,45 @@ def get_firmware(firmwareVersion):
         return jsonify(firmware_dict)
     
     return {'message': 'Firmware version not found!'}, 404
+
+def get_firmware_updates():
+    # Query all devices with firmware information
+    devices = db.session.query(Devices).all()
+    
+    updates_list = []
+    for device in devices:
+        # Get current firmware details
+        current_firmware = None
+        if device.currentFirmwareVersion:
+            current_firmware = db.session.query(Firmware).filter_by(
+                id=device.currentFirmwareVersion
+            ).first()
+        
+        # Get target firmware details
+        target_firmware = None
+        if device.targetFirmwareVersion:
+            target_firmware = db.session.query(Firmware).filter_by(
+                id=device.targetFirmwareVersion
+            ).first()
+        
+        # Build device info dict
+        device_info = {
+            'deviceID': device.deviceID,
+            'name': device.name,
+            'current_firmware': {
+                'id': device.currentFirmwareVersion,
+                'version': current_firmware.firmwareVersion if current_firmware else None,
+                'type': current_firmware.firmware_type if current_firmware else None
+            },
+            'target_firmware': {
+                'id': device.targetFirmwareVersion,
+                'version': target_firmware.firmwareVersion if target_firmware else None,
+                'type': target_firmware.firmware_type if target_firmware else None
+            },
+            'firmware_download_state': device.firmwareDownloadState,
+            'file_download_state': device.fileDownloadState
+        }
+        
+        updates_list.append(device_info)
+    
+    return jsonify(updates_list)

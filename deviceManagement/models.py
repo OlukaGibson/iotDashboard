@@ -150,9 +150,11 @@ class Devices(db.Model):
     targetFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
     fileDownloadState = db.Column(db.Boolean, default=False)
     profile = db.Column(db.Integer, db.ForeignKey('profiles.id'), default=None)
+    firmwareDownloadState = db.Column(Enum('updated', 'pending', 'failed', name='firmware_download_state_enum'), nullable=True, default='updated')
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+    # updated_at = db.Column(db.DateTime, server_default=db.func.now(), server_onupdate=db.func.now())
 
-    def __init__(self, name, readkey, writekey, deviceID,  networkID, profile,currentFirmwareVersion, previousFirmwareVersion, targetFirmwareVersion, fileDownloadState ):
+    def __init__(self, name, readkey, writekey, deviceID,  networkID, profile,currentFirmwareVersion, previousFirmwareVersion, targetFirmwareVersion, fileDownloadState, firmwareDownloadState ):
         self.name = name
         self.readkey = readkey
         self.writekey = writekey
@@ -163,6 +165,7 @@ class Devices(db.Model):
         self.previousFirmwareVersion = previousFirmwareVersion
         self.targetFirmwareVersion = targetFirmwareVersion
         self.fileDownloadState = fileDownloadState
+        self.firmwareDownloadState = firmwareDownloadState
 
 class DeviceData(db.Model):
     __tablename__ = 'devicedata'

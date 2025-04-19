@@ -1,6 +1,6 @@
 from flask import request, jsonify
 from ..extentions import db
-from ..models import Profiles, Devices, ConfigValues, MetadataValues,DeviceData
+from ..models import Profiles, Devices, ConfigValues, MetadataValues,DeviceData, Firmware
 from datetime import datetime, timedelta
 from . import device_management, clean_data
 
@@ -220,9 +220,21 @@ def get_config_data(deviceID):
     
     configuration = {
         "deviceID": device.deviceID,
-        "created_at": config_data.created_at,
+        # "created_at": config_data.created_at,
+        "fileDownloadState": device.fileDownloadState,
         "configs": {}
     }
+    
+    # Add target firmware version info if file download is true
+    if device.fileDownloadState and device.targetFirmwareVersion:
+        target_firmware = db.session.query(Firmware).filter_by(id=device.targetFirmwareVersion).first()
+        if target_firmware:
+            configuration["firmwareVersion"] = target_firmware.firmwareVersion
+            # configuration["targetFirmware"] = {
+            #     "id": target_firmware.id,
+            #     "version": target_firmware.firmwareVersion,
+            #     "type": target_firmware.firmware_type
+            # }
     
     # Populate the configuration fields with their actual names from the profile
     for i in range(1, 11):
