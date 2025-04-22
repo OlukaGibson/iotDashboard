@@ -2,7 +2,11 @@ from flask import request, jsonify
 from ..extentions import db
 from ..models import Profiles, Devices, ConfigValues, MetadataValues,DeviceData, Firmware
 from datetime import datetime, timedelta
-from . import device_management, clean_data
+from . import device_management, clean_data, calculate_crc32, credentials
+import os
+from google.cloud import storage
+import tempfile
+
 
 """
 Device data related routes for data management
@@ -202,7 +206,7 @@ def update_config_data():
 
 #fetch config data by device
 @device_management.route('/device/<int:deviceID>/getconfig', methods=['GET'])
-def get_config_data(deviceID):
+def get_config_data(deviceID):    
     device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
     if not device:
         return {'message': 'Device not found!'}, 404
@@ -230,11 +234,26 @@ def get_config_data(deviceID):
         target_firmware = db.session.query(Firmware).filter_by(id=device.targetFirmwareVersion).first()
         if target_firmware:
             configuration["firmwareVersion"] = target_firmware.firmwareVersion
-            # configuration["targetFirmware"] = {
-            #     "id": target_firmware.id,
-            #     "version": target_firmware.firmwareVersion,
-            #     "type": target_firmware.firmware_type
-            # }
+            
+            # Add CRC32 of the firmware file by downloading it temporarily and calculating
+            if target_firmware.firmware_string:
+                try:
+                    storage_client = storage.Client(credentials=credentials)
+                    bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
+                    blob = bucket.blob(target_firmware.firmware_string)
+                    
+                    # Create temporary file to calculate CRC32
+                    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                        temp_path = temp_file.name
+                        blob.download_to_filename(temp_path)
+                    
+                    # Calculate CRC32 of the temporary file
+                    configuration["firmwareCRC32"] = calculate_crc32(temp_path)
+                    
+                    # Clean up the temporary file
+                    os.unlink(temp_path)
+                except Exception as e:
+                    print(f"Error calculating CRC32 for firmware file: {str(e)}")
     
     # Populate the configuration fields with their actual names from the profile
     for i in range(1, 11):
@@ -245,7 +264,6 @@ def get_config_data(deviceID):
             configuration["configs"][config_name] = config_value
     
     return jsonify(configuration)
-
 
 
 

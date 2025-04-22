@@ -3,6 +3,7 @@ import os
 import json
 from google.oauth2 import service_account
 from dotenv import load_dotenv
+import zlib
 
 load_dotenv()
 
@@ -18,6 +19,14 @@ credentials = service_account.Credentials.from_service_account_info(credentials_
 
 def clean_data(data):
     return None if data == "" else data
+
+def calculate_crc32(file_path):
+    """Calculate the CRC32 of a file."""
+    crc = 0
+    with open(file_path, 'rb') as f:
+        for chunk in iter(lambda: f.read(4096), b''):
+            crc = zlib.crc32(chunk, crc)
+    return format(crc & 0xFFFFFFFF, '08X')
 
 # Import all routes
 from .profile_routes import *
