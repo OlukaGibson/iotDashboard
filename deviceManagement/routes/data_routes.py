@@ -210,6 +210,113 @@ def update_config_data():
 
     return {'message': 'Device config data updated successfully!'}, 200
 
+@device_management.route('/mass_edit_config_data', methods=['POST'])
+def mass_edit_config_data():
+    json_data = request.get_json()
+    if not json_data:
+        return {'message': 'No data provided!'}, 400
+    
+    device_ids = json_data.get('deviceIDs')
+    config_labels = json_data.get('configLabels')
+    config_values = json_data.get('configValues')
+    
+    if not device_ids or not isinstance(device_ids, list):
+        return {'message': 'No device IDs provided or invalid format!'}, 400
+        
+    if not config_labels or not config_values:
+        return {'message': 'Config labels or values missing!'}, 400
+    
+    # Track results
+    results = {
+        'success': [],
+        'failed': []
+    }
+    
+    for device_id in device_ids:
+        try:
+            # Get device
+            device = db.session.query(Devices).filter_by(deviceID=device_id).first()
+            if not device:
+                results['failed'].append({
+                    'deviceID': device_id,
+                    'error': 'Device not found'
+                })
+                continue
+                
+            # Get device profile
+            profile = db.session.query(Profiles).filter_by(id=device.profile).first()
+            if not profile:
+                results['failed'].append({
+                    'deviceID': device_id,
+                    'error': 'Profile not found for device'
+                })
+                continue
+                
+            # Get latest config for fallback values
+            latest_config = db.session.query(ConfigValues).filter_by(
+                deviceID=device_id
+            ).order_by(ConfigValues.created_at.desc()).first()
+            
+            # Prepare configs dict
+            configs = {}
+            
+            # For each possible config field
+            for i in range(1, 11):
+                config_key = f'config{i}'
+                profile_config_name = getattr(profile, config_key, None)
+                
+                # If this config exists in the profile
+                if profile_config_name:
+                    # Check if this config is in the input JSON
+                    if config_key in config_values:
+                        new_value = config_values.get(config_key)
+                        # If value is empty string, treat as None (no change)
+                        if new_value == "":
+                            # Use previous value if available
+                            if latest_config:
+                                configs[config_key] = getattr(latest_config, config_key, None)
+                            else:
+                                configs[config_key] = None
+                        else:
+                            # Use the new value
+                            configs[config_key] = clean_data(new_value)
+                    else:
+                        # Config not in input, use previous value if available
+                        if latest_config:
+                            configs[config_key] = getattr(latest_config, config_key, None)
+                        else:
+                            configs[config_key] = None
+                else:
+                    # Config doesn't exist in profile
+                    configs[config_key] = None
+            
+            # Create new config entry
+            new_config = ConfigValues(
+                created_at=datetime.now(),
+                deviceID=device_id,
+                **configs
+            )
+            
+            db.session.add(new_config)
+            results['success'].append(device_id)
+            
+        except Exception as e:
+            results['failed'].append({
+                'deviceID': device_id,
+                'error': str(e)
+            })
+    
+    # Commit all changes at once
+    try:
+        db.session.commit()
+        return {
+            'message': f'Updated configs for {len(results["success"])} devices, {len(results["failed"])} failed',
+            'results': results
+        }, 200
+    except Exception as e:
+        db.session.rollback()
+        return {'message': f'Transaction failed: {str(e)}'}, 500
+
 #fetch config data by device
 @device_management.route('/device/<int:deviceID>/getconfig', methods=['GET'])
 def get_config_data(deviceID):    
