@@ -148,10 +148,13 @@ def get_device(deviceID):
     else:
         profile_dict = None
 
-    # first 100 records of device data
-    device_data = db.session.query(DeviceData).filter_by(deviceID=deviceID).limit(100).all()
-    config_data = db.session.query(ConfigValues).filter_by(deviceID=deviceID).limit(100).all()
-    meta_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
+    # first 100 records of device data starting from the latest
+    device_data = db.session.query(DeviceData).filter_by(deviceID=deviceID).order_by(DeviceData.created_at.desc()).limit(100).all()
+    config_data = db.session.query(ConfigValues).filter_by(deviceID=deviceID).order_by(ConfigValues.created_at.desc()).limit(100).all()
+    meta_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).order_by(MetadataValues.created_at.desc()).limit(100).all()
+    # device_data = db.session.query(DeviceData).filter_by(deviceID=deviceID).limit(100).all()
+    # config_data = db.session.query(ConfigValues).filter_by(deviceID=deviceID).limit(100).all()
+    # meta_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
     device_data_list = []
     config_data_list = []
     meta_data_list = []

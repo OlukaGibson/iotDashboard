@@ -183,15 +183,21 @@ def update_config_data():
     if not profile:
         return {'message': 'Profile not found for the device!'}, 404
 
+    # Get the latest configuration to use for fallback values
+    latest_config = db.session.query(ConfigValues).filter_by(deviceID=deviceID).order_by(ConfigValues.created_at.desc()).first()
+    
     configs = {}
     for i in range(1, 11):
         config_name = getattr(profile, f'config{i}', None)
         if config_name:  # Only update if the configuration has a name in the profile
-            configs[f'config{i}'] = clean_data(request.form.get(f'config{i}', None))
+            new_value = clean_data(request.form.get(f'config{i}', None))
+            # If new value is None and there's a previous configuration, use that value
+            if new_value is None and latest_config is not None:
+                configs[f'config{i}'] = getattr(latest_config, f'config{i}', None)
+            else:
+                configs[f'config{i}'] = new_value
         else:
             configs[f'config{i}'] = None
-
-
     
     new_entry = ConfigValues(
         created_at=datetime.now(),
