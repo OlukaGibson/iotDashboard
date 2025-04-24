@@ -298,44 +298,20 @@ def get_firmware(firmwareVersion):
     
     return {'message': 'Firmware version not found!'}, 404
 
-def get_firmware_updates():
-    # Query all devices with firmware information
-    devices = db.session.query(Devices).all()
+@device_management.route('/firmware/updatefirmware_type', methods=['POST'])
+def update_firmware_type():
+    firmwareVersion = request.form.get('firmwareVersion')
+    firmware_type = request.form.get('firmware_type')
+
+    # Validate input
+    if not firmwareVersion or not firmware_type:
+        return {'message': 'Invalid input!'}, 400
+
+    # Update the firmware type in the database
+    firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
+    if firmware:
+        firmware.firmware_type = firmware_type
+        db.session.commit()
+        return {'message': 'Firmware type updated successfully!'}
     
-    updates_list = []
-    for device in devices:
-        # Get current firmware details
-        current_firmware = None
-        if device.currentFirmwareVersion:
-            current_firmware = db.session.query(Firmware).filter_by(
-                id=device.currentFirmwareVersion
-            ).first()
-        
-        # Get target firmware details
-        target_firmware = None
-        if device.targetFirmwareVersion:
-            target_firmware = db.session.query(Firmware).filter_by(
-                id=device.targetFirmwareVersion
-            ).first()
-        
-        # Build device info dict
-        device_info = {
-            'deviceID': device.deviceID,
-            'name': device.name,
-            'current_firmware': {
-                'id': device.currentFirmwareVersion,
-                'version': current_firmware.firmwareVersion if current_firmware else None,
-                'type': current_firmware.firmware_type if current_firmware else None
-            },
-            'target_firmware': {
-                'id': device.targetFirmwareVersion,
-                'version': target_firmware.firmwareVersion if target_firmware else None,
-                'type': target_firmware.firmware_type if target_firmware else None
-            },
-            'firmware_download_state': device.firmwareDownloadState,
-            'file_download_state': device.fileDownloadState
-        }
-        
-        updates_list.append(device_info)
-    
-    return jsonify(updates_list)
+    return {'message': 'Firmware version not found!'}, 404
