@@ -259,6 +259,51 @@ def edit_device(deviceID):
 
     return {'message': 'Use POST method to update device data!'}
 
+@device_management.route('/device/<int:deviceID>/update_firmware', methods=['POST'])
+def update_firmware(deviceID):
+    device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+
+    if not device:
+        return {'message': 'Device not found!'}, 404
+    
+    # Get firmware details from request data
+    firmware_id = request.json.get('firmwareID')
+    firmware_version = request.json.get('firmwareVersion')
+    
+    if not firmware_id:
+        return {'message': 'Firmware ID is required!'}, 400
+    
+    if not firmware_version:
+        return {'message': 'Firmware version is required!'}, 400
+    
+    # Check if firmware exists with both ID and version matching
+    firmware = db.session.query(Firmware).filter_by(
+        id=firmware_id, 
+        firmwareVersion=firmware_version
+    ).first()
+    
+    if not firmware:
+        return {'message': 'Firmware not found or version mismatch!'}, 404
+    
+    # Update device target firmware
+    device.targetFirmwareVersion = firmware_id
+    
+    # Set download state based on whether target matches current firmware
+    if int(firmware_id) == int(device.currentFirmwareVersion):
+        device.firmwareDownloadState = 'updated'
+    else:
+        device.firmwareDownloadState = 'pending'
+    
+    # Commit changes to database
+    db.session.commit()
+    
+    return {
+        'message': 'Device firmware update initiated successfully!',
+        # 'deviceID': device.deviceID,
+        # 'targetFirmwareVersion': firmware.firmwareVersion,
+        # 'firmwareDownloadState': device.firmwareDownloadState
+    }
+
 #device self configuration
 @device_management.route('/device/<int:networkID>/selfconfig', methods=['GET'])
 def self_config(networkID):
