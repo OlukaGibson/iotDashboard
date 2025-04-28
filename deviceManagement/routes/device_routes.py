@@ -325,6 +325,7 @@ def self_config(networkID):
             'deviceID': device.deviceID,
             'networkID': device.networkID,
             'writekey': device.writekey,
+            'readkey': device.readkey,
             'configs': {}
         }
         
