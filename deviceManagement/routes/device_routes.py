@@ -28,6 +28,7 @@ def add_device():
     targetFirmwareVersion = clean_data(request.form.get('targetFirmwareVersion'))
     profile = clean_data(request.form.get('profile'))
     fileDownloadState = request.form.get('fileDownloadState', 'False').lower() in ['true', '1', 't', 'y', 'yes']
+    firmwareDownloadState = request.form.get('firmwareDownloadState', 'none')  # Default to 'none'
 
     # Create a new device object
     new_device = Devices(
@@ -40,7 +41,8 @@ def add_device():
         previousFirmwareVersion=previousFirmwareVersion,
         targetFirmwareVersion=targetFirmwareVersion,
         fileDownloadState=fileDownloadState,
-        profile=profile
+        profile=profile,
+        firmwareDownloadState=firmwareDownloadState  # Add the missing parameter
     )
 
     # Add the new device to the database and commit the transaction
