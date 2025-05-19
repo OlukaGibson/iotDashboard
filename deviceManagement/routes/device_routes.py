@@ -28,7 +28,7 @@ def add_device():
     targetFirmwareVersion = clean_data(request.form.get('targetFirmwareVersion'))
     profile = clean_data(request.form.get('profile'))
     fileDownloadState = request.form.get('fileDownloadState', 'False').lower() in ['true', '1', 't', 'y', 'yes']
-    firmwareDownloadState = request.form.get('firmwareDownloadState', 'none')  # Default to 'none'
+    firmwareDownloadState = request.form.get('firmwareDownloadState', 'updated')  # Default to 'none'
 
     # Create a new device object
     new_device = Devices(
