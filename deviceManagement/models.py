@@ -1,40 +1,46 @@
-from .extentions import db
-from sqlalchemy import Enum
+from datetime import datetime
+from typing import Optional, Dict, Any
+import random
+import string
 
-class Firmware(db.Model):
-    __tablename__ = 'firmware'
-    id = db.Column(db.Integer, primary_key=True)
-    firmwareVersion = db.Column(db.String(100), unique=True)
-    firmware_string = db.Column(db.String(100), nullable=False)
-    firmware_string_hex = db.Column(db.String(100), default=None, nullable=True)
-    firmware_string_bootloader = db.Column(db.String(100), default=None, nullable=True)
-    firmware_type = db.Column(Enum('stable', 'beta', 'deprecated', 'legacy', name='firmware_type_enum'), nullable=True, default='beta')
-    description = db.Column(db.String(100), default=None, nullable=True)
-    # documentation = db.Column(db.String(100), default=None)
-    # documentationLink = db.Column(db.String(100), default=None)
-    change1 = db.Column(db.String(100), default=None)
-    change2 = db.Column(db.String(100), default=None)
-    change3 = db.Column(db.String(100), default=None)
-    change4 = db.Column(db.String(100), default=None)
-    change5 = db.Column(db.String(100), default=None)
-    change6 = db.Column(db.String(100), default=None)
-    change7 = db.Column(db.String(100), default=None)
-    change8 = db.Column(db.String(100), default=None)
-    change9 = db.Column(db.String(100), default=None)
-    change10 = db.Column(db.String(100), default=None)
-    updated_at = db.Column(db.DateTime, server_default=db.func.now(), server_onupdate=db.func.now())    
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
+class FirestoreModel:
+    """Base class for Firestore document models"""
+    
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+    
+    def to_dict(self):
+        """Convert model to dictionary for Firestore"""
+        result = {}
+        for key, value in self.__dict__.items():
+            if not key.startswith('_'):
+                # Convert datetime objects to timestamp
+                if isinstance(value, datetime):
+                    result[key] = value
+                else:
+                    result[key] = value
+        return result
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]):
+        """Create model instance from Firestore document data"""
+        return cls(**data)
 
-
-    def __init__(self, firmwareVersion,firmware_string, firmware_string_hex, firmware_string_bootloader, firmware_type, description, change1, change2, change3, change4, change5, change6, change7, change8, change9, change10):
+class Firmware(FirestoreModel):
+    collection_name = 'firmware'
+    
+    def __init__(self, firmwareVersion=None, firmware_string=None, firmware_string_hex=None, 
+                 firmware_string_bootloader=None, firmware_type='beta', description=None, 
+                 change1=None, change2=None, change3=None, change4=None, change5=None, 
+                 change6=None, change7=None, change8=None, change9=None, change10=None, 
+                 created_at=None, updated_at=None, **kwargs):
         self.firmwareVersion = firmwareVersion
         self.firmware_string = firmware_string
         self.firmware_string_hex = firmware_string_hex
         self.firmware_string_bootloader = firmware_string_bootloader
-        self.firmware_type = firmware_type
+        self.firmware_type = firmware_type  # 'stable', 'beta', 'deprecated', 'legacy'
         self.description = description
-        # self.documentation = documentation
-        # self.documentationLink = documentationLink
         self.change1 = change1
         self.change2 = change2
         self.change3 = change3
@@ -45,57 +51,31 @@ class Firmware(db.Model):
         self.change8 = change8
         self.change9 = change9
         self.change10 = change10
+        self.created_at = created_at or datetime.now()
+        self.updated_at = updated_at or datetime.now()
+        
+        # Set any additional fields from kwargs
+        for key, value in kwargs.items():
+            if not hasattr(self, key):
+                setattr(self, key, value)
 
-class Profiles(db.Model):
-    __tablename__ = 'profiles'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True)
-    description = db.Column(db.String(100), default=None)
-    field1 = db.Column(db.String(100), default=None)
-    field2 = db.Column(db.String(100), default=None)
-    field3 = db.Column(db.String(100), default=None)
-    field4 = db.Column(db.String(100), default=None)
-    field5 = db.Column(db.String(100), default=None)
-    field6 = db.Column(db.String(100), default=None)
-    field7 = db.Column(db.String(100), default=None)
-    field8 = db.Column(db.String(100), default=None)
-    field9 = db.Column(db.String(100), default=None)
-    field10 = db.Column(db.String(100), default=None)
-    field11 = db.Column(db.String(100), default=None)
-    field12 = db.Column(db.String(100), default=None)
-    field13 = db.Column(db.String(100), default=None)
-    field14 = db.Column(db.String(100), default=None)
-    field15 = db.Column(db.String(100), default=None)
-    metadata1 = db.Column(db.String(100), default=None)
-    metadata2 = db.Column(db.String(100), default=None)
-    metadata3 = db.Column(db.String(100), default=None)
-    metadata4 = db.Column(db.String(100), default=None)
-    metadata5 = db.Column(db.String(100), default=None)
-    metadata6 = db.Column(db.String(100), default=None)
-    metadata7 = db.Column(db.String(100), default=None)
-    metadata8 = db.Column(db.String(100), default=None)
-    metadata9 = db.Column(db.String(100), default=None)
-    metadata10 = db.Column(db.String(100), default=None)
-    metadata11 = db.Column(db.String(100), default=None)
-    metadata12 = db.Column(db.String(100), default=None)
-    metadata13 = db.Column(db.String(100), default=None)
-    metadata14 = db.Column(db.String(100), default=None)
-    metadata15 = db.Column(db.String(100), default=None)
-    config1 = db.Column(db.String(100), default=None)
-    config2 = db.Column(db.String(100), default=None)
-    config3 = db.Column(db.String(100), default=None)
-    config4 = db.Column(db.String(100), default=None)
-    config5 = db.Column(db.String(100), default=None)
-    config6 = db.Column(db.String(100), default=None)
-    config7 = db.Column(db.String(100), default=None)
-    config8 = db.Column(db.String(100), default=None)
-    config9 = db.Column(db.String(100), default=None)
-    config10 = db.Column(db.String(100), default=None)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
-
-    def __init__(self, name, description, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15, config1, config2, config3, config4, config5, config6, config7, config8, config9, config10, metadata1, metadata2, metadata3, metadata4, metadata5, metadata6, metadata7, metadata8, metadata9, metadata10, metadata11, metadata12, metadata13, metadata14, metadata15):
+class Profiles(FirestoreModel):
+    collection_name = 'profiles'
+    
+    def __init__(self, name=None, description=None, 
+                 field1=None, field2=None, field3=None, field4=None, field5=None,
+                 field6=None, field7=None, field8=None, field9=None, field10=None,
+                 field11=None, field12=None, field13=None, field14=None, field15=None,
+                 metadata1=None, metadata2=None, metadata3=None, metadata4=None, metadata5=None,
+                 metadata6=None, metadata7=None, metadata8=None, metadata9=None, metadata10=None,
+                 metadata11=None, metadata12=None, metadata13=None, metadata14=None, metadata15=None,
+                 config1=None, config2=None, config3=None, config4=None, config5=None,
+                 config6=None, config7=None, config8=None, config9=None, config10=None,
+                 created_at=None, **kwargs):
         self.name = name
         self.description = description
+        
+        # Field attributes
         self.field1 = field1
         self.field2 = field2
         self.field3 = field3
@@ -111,6 +91,8 @@ class Profiles(db.Model):
         self.field13 = field13
         self.field14 = field14
         self.field15 = field15
+        
+        # Metadata attributes
         self.metadata1 = metadata1
         self.metadata2 = metadata2
         self.metadata3 = metadata3
@@ -126,6 +108,8 @@ class Profiles(db.Model):
         self.metadata13 = metadata13
         self.metadata14 = metadata14
         self.metadata15 = metadata15
+        
+        # Config attributes
         self.config1 = config1
         self.config2 = config2
         self.config3 = config3
@@ -136,71 +120,58 @@ class Profiles(db.Model):
         self.config8 = config8
         self.config9 = config9
         self.config10 = config10
+        
+        self.created_at = created_at or datetime.now()
+        
+        # Set any additional fields from kwargs
+        for key, value in kwargs.items():
+            if not hasattr(self, key):
+                setattr(self, key, value)
 
-class Devices(db.Model):
-    __tablename__ = 'devices'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True)
-    readkey = db.Column(db.String(100), unique=True)
-    deviceID = db.Column(db.Integer, unique=True)
-    writekey = db.Column(db.String(100), unique=True)
-    networkID = db.Column(db.String(100), default=None)
-    currentFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
-    previousFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
-    targetFirmwareVersion = db.Column(db.Integer, db.ForeignKey('firmware.id'), default=None)
-    fileDownloadState = db.Column(db.Boolean, default=False)
-    profile = db.Column(db.Integer, db.ForeignKey('profiles.id'), default=None)
-    firmwareDownloadState = db.Column(Enum('updated', 'pending', 'failed', name='firmware_download_state_enum'), nullable=True, default='updated')
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
-    updated_at = db.Column(db.DateTime, server_default=db.func.now(), server_onupdate=db.func.now())
-
-    def __init__(self, name, readkey, writekey, deviceID,  networkID, profile,currentFirmwareVersion, previousFirmwareVersion, targetFirmwareVersion, fileDownloadState, firmwareDownloadState ):
+class Devices(FirestoreModel):
+    collection_name = 'devices'
+    
+    def __init__(self, name=None, readkey=None, writekey=None, deviceID=None, networkID=None,
+                 currentFirmwareVersion=None, previousFirmwareVersion=None, targetFirmwareVersion=None,
+                 fileDownloadState=False, profile=None, firmwareDownloadState='updated',
+                 created_at=None, updated_at=None, **kwargs):
         self.name = name
-        self.readkey = readkey
-        self.writekey = writekey
+        self.readkey = readkey or self._generate_key()
+        self.writekey = writekey or self._generate_key()
         self.deviceID = deviceID
         self.networkID = networkID
-        self.profile = profile
+        # In Firestore, these will store document IDs or references instead of foreign keys
         self.currentFirmwareVersion = currentFirmwareVersion
         self.previousFirmwareVersion = previousFirmwareVersion
         self.targetFirmwareVersion = targetFirmwareVersion
         self.fileDownloadState = fileDownloadState
-        self.firmwareDownloadState = firmwareDownloadState
+        self.profile = profile
+        self.firmwareDownloadState = firmwareDownloadState  # 'updated', 'pending', 'failed'
+        self.created_at = created_at or datetime.now()
+        self.updated_at = updated_at or datetime.now()
+        
+        # Set any additional fields from kwargs
+        for key, value in kwargs.items():
+            if not hasattr(self, key):
+                setattr(self, key, value)
+    
+    @staticmethod
+    def _generate_key():
+        return ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
 
-class DeviceData(db.Model):
-    __tablename__ = 'devicedata'
-    id = db.Column(db.Integer, primary_key=True)
-    entryID = db.Column(db.Integer)
-    deviceID = db.Column(db.Integer, db.ForeignKey('devices.deviceID'))
-    created_at = db.Column(db.DateTime)  # Removed server_default
-    field1 = db.Column(db.String(100), default=None)
-    field2 = db.Column(db.String(100), default=None)
-    field3 = db.Column(db.String(100), default=None)
-    field4 = db.Column(db.String(100), default=None)
-    field5 = db.Column(db.String(100), default=None)
-    field6 = db.Column(db.String(100), default=None)
-    field7 = db.Column(db.String(100), default=None)
-    field8 = db.Column(db.String(100), default=None)
-    field9 = db.Column(db.String(100), default=None)
-    field10 = db.Column(db.String(100), default=None)
-    field11 = db.Column(db.String(100), default=None)
-    field12 = db.Column(db.String(100), default=None)
-    field13 = db.Column(db.String(100), default=None)
-    field14 = db.Column(db.String(100), default=None)
-    field15 = db.Column(db.String(100), default=None)
-
-    __table_args__ = (db.UniqueConstraint('deviceID', 'entryID', name='unique_device_entry'),)
-
-    @classmethod
-    def get_next_entry_id(cls, device_id):
-        """Get the next available entry ID for a specific device."""
-        max_entry = db.session.query(db.func.max(cls.entryID)).filter(cls.deviceID == device_id).scalar()
-        return 1 if max_entry is None else max_entry + 1
-
-    def __init__(self, created_at, deviceID, entryID, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15):
-        self.created_at = created_at
-        self.deviceID = deviceID
+class DeviceData(FirestoreModel):
+    collection_name = 'devicedata'
+    
+    def __init__(self, entryID=None, deviceID=None, created_at=None,
+                 field1=None, field2=None, field3=None, field4=None, field5=None,
+                 field6=None, field7=None, field8=None, field9=None, field10=None,
+                 field11=None, field12=None, field13=None, field14=None, field15=None,
+                 **kwargs):
         self.entryID = entryID
+        self.deviceID = deviceID
+        self.created_at = created_at or datetime.now()
+        
+        # Field attributes
         self.field1 = field1
         self.field2 = field2
         self.field3 = field3
@@ -216,31 +187,34 @@ class DeviceData(db.Model):
         self.field13 = field13
         self.field14 = field14
         self.field15 = field15
+        
+        # Set any additional fields from kwargs
+        for key, value in kwargs.items():
+            if not hasattr(self, key):
+                setattr(self, key, value)
+    
+    @staticmethod
+    def get_next_entry_id(deviceID):
+        """Get the next available entry ID for a specific device."""
+        from .extentions import db
+        # Query Firestore to get the highest entryID for this device
+        docs = db.collection('devicedata').where('deviceID', '==', deviceID).order_by('entryID', direction='DESCENDING').limit(1).get()
+        if docs:
+            return docs[0].to_dict().get('entryID', 0) + 1
+        return 1
 
-class MetadataValues(db.Model):
-    __tablename__ = 'metadatavalues'
-    id = db.Column(db.Integer, primary_key=True)
-    deviceID = db.Column(db.Integer, db.ForeignKey('devices.deviceID'))
-    created_at = db.Column(db.DateTime)
-    metadata1 = db.Column(db.String(100), default=None)
-    metadata2 = db.Column(db.String(100), default=None)
-    metadata3 = db.Column(db.String(100), default=None)
-    metadata4 = db.Column(db.String(100), default=None)
-    metadata5 = db.Column(db.String(100), default=None)
-    metadata6 = db.Column(db.String(100), default=None)
-    metadata7 = db.Column(db.String(100), default=None)
-    metadata8 = db.Column(db.String(100), default=None)
-    metadata9 = db.Column(db.String(100), default=None)
-    metadata10 = db.Column(db.String(100), default=None)
-    metadata11 = db.Column(db.String(100), default=None)
-    metadata12 = db.Column(db.String(100), default=None)
-    metadata13 = db.Column(db.String(100), default=None)
-    metadata14 = db.Column(db.String(100), default=None)
-    metadata15 = db.Column(db.String(100), default=None)
-
-    def __init__(self, created_at, deviceID, metadata1, metadata2, metadata3, metadata4, metadata5, metadata6, metadata7, metadata8, metadata9, metadata10, metadata11, metadata12, metadata13, metadata14, metadata15):
-        self.created_at = created_at
+class MetadataValues(FirestoreModel):
+    collection_name = 'metadatavalues'
+    
+    def __init__(self, deviceID=None, created_at=None,
+                 metadata1=None, metadata2=None, metadata3=None, metadata4=None, metadata5=None,
+                 metadata6=None, metadata7=None, metadata8=None, metadata9=None, metadata10=None,
+                 metadata11=None, metadata12=None, metadata13=None, metadata14=None, metadata15=None,
+                 **kwargs):
         self.deviceID = deviceID
+        self.created_at = created_at or datetime.now()
+        
+        # Metadata attributes
         self.metadata1 = metadata1
         self.metadata2 = metadata2
         self.metadata3 = metadata3
@@ -249,33 +223,30 @@ class MetadataValues(db.Model):
         self.metadata6 = metadata6
         self.metadata7 = metadata7
         self.metadata8 = metadata8
-        self.metadata9 =  metadata9
+        self.metadata9 = metadata9
         self.metadata10 = metadata10
         self.metadata11 = metadata11
         self.metadata12 = metadata12
         self.metadata13 = metadata13
         self.metadata14 = metadata14
         self.metadata15 = metadata15
+        
+        # Set any additional fields from kwargs
+        for key, value in kwargs.items():
+            if not hasattr(self, key):
+                setattr(self, key, value)
 
-class ConfigValues(db.Model):
-    __tablename__ = 'configvalues'
-    id = db.Column(db.Integer, primary_key=True)
-    deviceID = db.Column(db.Integer, db.ForeignKey('devices.deviceID'))
-    created_at = db.Column(db.DateTime)  
-    config1 = db.Column(db.String(100), default=None)
-    config2 = db.Column(db.String(100), default=None)
-    config3 = db.Column(db.String(100), default=None)
-    config4 = db.Column(db.String(100), default=None)
-    config5 = db.Column(db.String(100), default=None)
-    config6 = db.Column(db.String(100), default=None)
-    config7 = db.Column(db.String(100), default=None)
-    config8 = db.Column(db.String(100), default=None)
-    config9 = db.Column(db.String(100), default=None)
-    config10 = db.Column(db.String(100), default=None)
-
-    def __init__(self, created_at, deviceID, config1, config2, config3, config4, config5, config6, config7, config8, config9, config10):
-        self.created_at = created_at
+class ConfigValues(FirestoreModel):
+    collection_name = 'configvalues'
+    
+    def __init__(self, deviceID=None, created_at=None,
+                 config1=None, config2=None, config3=None, config4=None, config5=None,
+                 config6=None, config7=None, config8=None, config9=None, config10=None,
+                 **kwargs):
         self.deviceID = deviceID
+        self.created_at = created_at or datetime.now()
+        
+        # Config attributes
         self.config1 = config1
         self.config2 = config2
         self.config3 = config3
@@ -286,14 +257,21 @@ class ConfigValues(db.Model):
         self.config8 = config8
         self.config9 = config9
         self.config10 = config10
+        
+        # Set any additional fields from kwargs
+        for key, value in kwargs.items():
+            if not hasattr(self, key):
+                setattr(self, key, value)
 
-class DeviceFiles(db.Model):
-    __tablename__ = 'devicefiles'
-    id = db.Column(db.Integer, primary_key=True)
-    deviceID = db.Column(db.Integer, db.ForeignKey('devices.deviceID'))
-    file = db.Column(db.String(100), default=None, nullable=False)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
-
-    def __init__(self, deviceID, file):
+class DeviceFiles(FirestoreModel):
+    collection_name = 'devicefiles'
+    
+    def __init__(self, deviceID=None, file=None, created_at=None, **kwargs):
         self.deviceID = deviceID
         self.file = file
+        self.created_at = created_at or datetime.now()
+        
+        # Set any additional fields from kwargs
+        for key, value in kwargs.items():
+            if not hasattr(self, key):
+                setattr(self, key, value)

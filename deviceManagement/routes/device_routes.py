@@ -2,7 +2,7 @@ from flask import request, jsonify
 import random
 import string
 from datetime import datetime
-from ..extentions import db
+from ..firestore_helpers import session as db
 from ..models import Devices, Firmware, Profiles, MetadataValues, ConfigValues, DeviceData
 from . import device_management, clean_data
 
@@ -17,8 +17,8 @@ def add_device():
     readkey = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
 
     # Determine the next deviceID by finding the maximum existing deviceID and adding 1
-    last_device = db.session.query(Devices).order_by(Devices.deviceID.desc()).first()
-    deviceID = (last_device.deviceID + 1) if last_device else 1  # Start from 1 if no devices exist
+    devices = db.query(Devices).order_by('deviceID', 'DESCENDING').limit(1).all()
+    deviceID = (devices[0].deviceID + 1) if devices else 1  # Start from 1 if no devices exist
 
     # Extract other fields from form data with default value None if not present
     name = clean_data(request.form.get('name'))
@@ -28,7 +28,7 @@ def add_device():
     targetFirmwareVersion = clean_data(request.form.get('targetFirmwareVersion'))
     profile = clean_data(request.form.get('profile'))
     fileDownloadState = request.form.get('fileDownloadState', 'False').lower() in ['true', '1', 't', 'y', 'yes']
-    firmwareDownloadState = request.form.get('firmwareDownloadState', 'updated')  # Default to 'none'
+    firmwareDownloadState = request.form.get('firmwareDownloadState', 'updated')
 
     # Create a new device object
     new_device = Devices(
@@ -42,12 +42,12 @@ def add_device():
         targetFirmwareVersion=targetFirmwareVersion,
         fileDownloadState=fileDownloadState,
         profile=profile,
-        firmwareDownloadState=firmwareDownloadState  # Add the missing parameter
+        firmwareDownloadState=firmwareDownloadState
     )
 
-    # Add the new device to the database and commit the transaction
-    db.session.add(new_device)
-    db.session.commit()
+    # Add the new device to Firestore
+    db.add(new_device)
+    db.commit()
 
     return {
         'message': 'New device added successfully!',
@@ -59,33 +59,32 @@ def add_device():
 # Retrieve all devices
 @device_management.route('/get_devices', methods=['GET'])
 def get_devices():
-    devices = db.session.query(Devices).all()
+    devices = db.query(Devices).all()
     
     devices_list = []
     for device in devices:
-
         currentFirmwareID = device.currentFirmwareVersion
         previousFirmwareID = device.previousFirmwareVersion
         targetFirmwareID = device.targetFirmwareVersion
 
-        currentFirmware = db.session.query(Firmware).filter_by(id=currentFirmwareID).first()   # currentFirmwareVersion
-        previousFirmware = db.session.query(Firmware).filter_by(id=previousFirmwareID).first() # previousFirmwareVersion
-        targetFirmware = db.session.query(Firmware).filter_by(id=targetFirmwareID).first()     # targetFirmwareVersion
+        # Get firmware versions by firmwareVersion field (since we don't have IDs in Firestore)
+        currentFirmware = db.query(Firmware).filter_by(firmwareVersion=currentFirmwareID).first() if currentFirmwareID else None
+        previousFirmware = db.query(Firmware).filter_by(firmwareVersion=previousFirmwareID).first() if previousFirmwareID else None
+        targetFirmware = db.query(Firmware).filter_by(firmwareVersion=targetFirmwareID).first() if targetFirmwareID else None
 
         currentFirmwareVersion = currentFirmware.firmwareVersion if currentFirmware else None
         previousFirmwareVersion = previousFirmware.firmwareVersion if previousFirmware else currentFirmwareVersion
         targetFirmwareVersion = targetFirmware.firmwareVersion if targetFirmware else currentFirmwareVersion
 
         # Fetch the profile name
-        profile = db.session.query(Profiles).filter_by(id=device.profile).first()
+        profile = db.query(Profiles).filter_by(name=device.profile).first() if device.profile else None
         profile_name = profile.name if profile else None
 
-        # Fetch the last time the device posted metadata
-        last_metadata_entry = db.session.query(DeviceData).filter_by(deviceID=device.deviceID).order_by(DeviceData.created_at.desc()).first()
-        last_posted_time = last_metadata_entry.created_at if last_metadata_entry else None
+        # Fetch the last time the device posted data
+        last_data_entries = db.query(DeviceData).filter_by(deviceID=device.deviceID).order_by('created_at', 'DESCENDING').limit(1).all()
+        last_posted_time = last_data_entries[0].created_at if last_data_entries else None
 
         device_dict = {
-            'id': device.id,
             'name': device.name,
             'readkey': device.readkey,
             'writekey': device.writekey,
@@ -109,7 +108,7 @@ def get_devices():
 # Retrieve a specific device
 @device_management.route('/get_device/<int:deviceID>', methods=['GET'])
 def get_device(deviceID):
-    device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+    device = db.query(Devices).filter_by(deviceID=deviceID).first()
 
     if not device:
         return {'message': 'Device not found!'}, 404
@@ -118,25 +117,26 @@ def get_device(deviceID):
     previousFirmwareID = device.previousFirmwareVersion
     targetFirmwareID = device.targetFirmwareVersion
 
-    currentFirmware = db.session.query(Firmware).filter_by(id=currentFirmwareID).first()   #currentFirmwareVersion
-    previousFirmware = db.session.query(Firmware).filter_by(id=previousFirmwareID).first() #previousFirmwareVersion
-    targetFirmware = db.session.query(Firmware).filter_by(id=targetFirmwareID).first()     #targetFirmwareVersion
+    # Get firmware versions by firmwareVersion field
+    currentFirmware = db.query(Firmware).filter_by(firmwareVersion=currentFirmwareID).first() if currentFirmwareID else None
+    previousFirmware = db.query(Firmware).filter_by(firmwareVersion=previousFirmwareID).first() if previousFirmwareID else None
+    targetFirmware = db.query(Firmware).filter_by(firmwareVersion=targetFirmwareID).first() if targetFirmwareID else None
     
     currentFirmwareVersion = currentFirmware.firmwareVersion if currentFirmware else None
     previousFirmwareVersion = previousFirmware.firmwareVersion if previousFirmware else None
     targetFirmwareVersion = targetFirmware.firmwareVersion if targetFirmware else None
 
-    deviceProfile = db.session.query(Profiles).filter_by(id=device.profile).first()
+    # Get profile by name instead of ID
+    deviceProfile = db.query(Profiles).filter_by(name=device.profile).first() if device.profile else None
     
     if deviceProfile:
         profile_dict = {
-            'id': deviceProfile.id,
             'name': deviceProfile.name,
             'description': deviceProfile.description,
             'created_at': deviceProfile.created_at,
             'fields': {},
             'configs': {},
-            'metadata': {}  # Add the missing 'metadata' key
+            'metadata': {}
         }
         for i in range(1, 16):
             if getattr(deviceProfile, f'field{i}') is not None:
@@ -150,19 +150,17 @@ def get_device(deviceID):
     else:
         profile_dict = None
 
-    # first 100 records of device data starting from the latest
-    device_data = db.session.query(DeviceData).filter_by(deviceID=deviceID).order_by(DeviceData.created_at.desc()).limit(100).all()
-    config_data = db.session.query(ConfigValues).filter_by(deviceID=deviceID).order_by(ConfigValues.created_at.desc()).limit(100).all()
-    meta_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).order_by(MetadataValues.created_at.desc()).limit(100).all()
-    # device_data = db.session.query(DeviceData).filter_by(deviceID=deviceID).limit(100).all()
-    # config_data = db.session.query(ConfigValues).filter_by(deviceID=deviceID).limit(100).all()
-    # meta_data = db.session.query(MetadataValues).filter_by(deviceID=deviceID).limit(100).all()
+    # Get first 100 records of device data starting from the latest
+    device_data = db.query(DeviceData).filter_by(deviceID=deviceID).order_by('created_at', 'DESCENDING').limit(100).all()
+    config_data = db.query(ConfigValues).filter_by(deviceID=deviceID).order_by('created_at', 'DESCENDING').limit(100).all()
+    meta_data = db.query(MetadataValues).filter_by(deviceID=deviceID).order_by('created_at', 'DESCENDING').limit(100).all()
+
     device_data_list = []
     config_data_list = []
     meta_data_list = []
+    
     for data in meta_data:
         data_dict = {
-            'entryID': data.id,
             'created_at': data.created_at,
         }
         for i in range(1, 16):
@@ -172,7 +170,6 @@ def get_device(deviceID):
 
     for data in config_data:
         data_dict = {
-            'entryID': data.id,
             'created_at': data.created_at,
         }
         for i in range(1, 11):
@@ -182,7 +179,7 @@ def get_device(deviceID):
 
     for data in device_data:
         data_dict = {
-            'entryID': data.id,
+            'entryID': data.entryID,
             'created_at': data.created_at,
         }
         for i in range(1, 16):
@@ -191,13 +188,11 @@ def get_device(deviceID):
         device_data_list.append(data_dict)
         
     device_dict = {
-        'id': device.id,
         'created_at': device.created_at,
         'name': device.name,
         'readkey': device.readkey,
         'writekey': device.writekey,
         'deviceID': device.deviceID,
-        'profile': device.profile,
         'currentFirmwareVersion': currentFirmwareVersion,
         'targetFirmwareVersion': targetFirmwareVersion,
         'previousFirmwareVersion': previousFirmwareVersion,
@@ -214,7 +209,7 @@ def get_device(deviceID):
 # Edit device data
 @device_management.route('/device/<int:deviceID>/edit', methods=['GET', 'POST'])
 def edit_device(deviceID):
-    device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+    device = db.query(Devices).filter_by(deviceID=deviceID).first()
 
     if not device:
         return {'message': 'Device not found!'}, 404
@@ -230,14 +225,7 @@ def edit_device(deviceID):
         targetFirmwareVersion = request.form.get('targetFirmwareVersion', device.targetFirmwareVersion)
         fileDownloadState = request.form.get('fileDownloadState', device.fileDownloadState)
 
-        fields = {}
-        configs = {}
-        for i in range(1, 16):
-            fields[f'field{i}'] = request.form.get(f'field{i}', getattr(device, f'field{i}'))
-
-        for i in range(1, 11):
-            configs[f'config{i}'] = request.form.get(f'config{i}', getattr(device, f'config{i}'))
-
+        # Update device attributes
         device.name = name
         device.readkey = readkey
         device.writekey = writekey
@@ -246,16 +234,15 @@ def edit_device(deviceID):
         device.previousFirmwareVersion = previousFirmwareVersion
         device.targetFirmwareVersion = targetFirmwareVersion
         device.fileDownloadState = fileDownloadState
+        device.updated_at = datetime.now()
 
-        # Update fields
-        for i in range(1, 16):
-            setattr(device, f'field{i}', fields[f'field{i}'])
-        
-        for i in range(1, 11):
-            setattr(device, f'config{i}', configs[f'config{i}'])
-
-        # Commit the changes to the database
-        db.session.commit()
+        # Update device in Firestore
+        from ..extentions import db as firestore_db
+        # Find the document by deviceID and update it
+        docs = firestore_db.collection('devices').where('deviceID', '==', deviceID).get()
+        if docs:
+            doc_ref = docs[0].reference
+            doc_ref.update(device.to_dict())
 
         return {'message': 'Device updated successfully!'}
 
@@ -263,63 +250,61 @@ def edit_device(deviceID):
 
 @device_management.route('/device/<int:deviceID>/update_firmware', methods=['POST'])
 def update_firmware(deviceID):
-    device = db.session.query(Devices).filter_by(deviceID=deviceID).first()
+    device = db.query(Devices).filter_by(deviceID=deviceID).first()
 
     if not device:
         return {'message': 'Device not found!'}, 404
     
     # Get firmware details from request data
-    firmware_id = request.json.get('firmwareID')
     firmware_version = request.json.get('firmwareVersion')
-    
-    if not firmware_id:
-        return {'message': 'Firmware ID is required!'}, 400
     
     if not firmware_version:
         return {'message': 'Firmware version is required!'}, 400
     
-    # Check if firmware exists with both ID and version matching
-    firmware = db.session.query(Firmware).filter_by(
-        id=firmware_id, 
-        firmwareVersion=firmware_version
-    ).first()
+    # Check if firmware exists
+    firmware = db.query(Firmware).filter_by(firmwareVersion=firmware_version).first()
     
     if not firmware:
-        return {'message': 'Firmware not found or version mismatch!'}, 404
+        return {'message': 'Firmware not found!'}, 404
     
     # Update device target firmware
-    device.targetFirmwareVersion = firmware_id
+    device.targetFirmwareVersion = firmware_version
     
     # Set download state based on whether target matches current firmware
-    if int(firmware_id) == int(device.currentFirmwareVersion):
+    if firmware_version == device.currentFirmwareVersion:
         device.firmwareDownloadState = 'updated'
     else:
         device.firmwareDownloadState = 'pending'
     
-    # Commit changes to database
-    db.session.commit()
+    device.updated_at = datetime.now()
+    
+    # Update in Firestore
+    from ..extentions import db as firestore_db
+    docs = firestore_db.collection('devices').where('deviceID', '==', deviceID).get()
+    if docs:
+        doc_ref = docs[0].reference
+        doc_ref.update(device.to_dict())
     
     return {
         'message': 'Device firmware update initiated successfully!',
-        # 'deviceID': device.deviceID,
-        # 'targetFirmwareVersion': firmware.firmwareVersion,
-        # 'firmwareDownloadState': device.firmwareDownloadState
     }
 
-#device self configuration
+# Device self configuration
 @device_management.route('/device/<int:networkID>/selfconfig', methods=['GET'])
 def self_config(networkID):
     networkID = str(networkID)
-    device = db.session.query(Devices).filter_by(networkID=networkID).first()
+    device = db.query(Devices).filter_by(networkID=networkID).first()
+    
     if not device:
         return {'message': 'Device not found!'}, 404
 
     try:
-        # Get the associated profile
-        profile = db.session.query(Profiles).filter_by(id=device.profile).first()
+        # Get the associated profile by name
+        profile = db.query(Profiles).filter_by(name=device.profile).first() if device.profile else None
         
         # Get the latest config values
-        latest_config = db.session.query(ConfigValues).filter_by(deviceID=device.deviceID).order_by(ConfigValues.created_at.desc()).first()
+        latest_configs = db.query(ConfigValues).filter_by(deviceID=device.deviceID).order_by('created_at', 'DESCENDING').limit(1).all()
+        latest_config = latest_configs[0] if latest_configs else None
         
         # Prepare device basic details
         device_details = {
@@ -335,7 +320,7 @@ def self_config(networkID):
         if profile and latest_config:
             for i in range(1, 11):
                 config_name = getattr(profile, f'config{i}')
-                if config_name:  # Only include configs that are defined in the profile
+                if config_name:
                     config_value = getattr(latest_config, f'config{i}')
                     device_details['configs'][config_name] = config_value
 

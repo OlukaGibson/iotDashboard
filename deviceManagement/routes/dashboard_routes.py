@@ -2,7 +2,7 @@ from flask import request, jsonify
 import random
 import string
 from datetime import datetime, timedelta
-from ..extentions import db
+from ..firestore_helpers import session as db
 from ..models import Devices, Firmware, Profiles, MetadataValues, ConfigValues, DeviceData
 from . import device_management, clean_data
 
@@ -22,16 +22,16 @@ def device_storage():
 @device_management.route('/dashboard_summary', methods=['GET'])
 def dashboard_summary():
     # Total number of devices
-    total_devices = db.session.query(Devices).count()
+    total_devices = db.query(Devices).count()
 
     # Total number of profiles
-    total_profiles = db.session.query(Profiles).count()
+    total_profiles = db.query(Profiles).count()
 
     # Total number of firmware versions
-    total_firmware_versions = db.session.query(Firmware).count()
+    total_firmware_versions = db.query(Firmware).count()
 
     # Latest firmware and its upload time
-    latest_firmware = db.session.query(Firmware).order_by(Firmware.created_at.desc()).first()
+    latest_firmware = db.query(Firmware).order_by('created_at', 'DESCENDING').limit(1).first()
     latest_firmware_info = {
         'firmwareVersion': latest_firmware.firmwareVersion,
         'uploaded_at': latest_firmware.created_at
@@ -41,13 +41,11 @@ def dashboard_summary():
     # Online devices are those that have posted data in the last 3 hours
     three_hours_ago = datetime.now() - timedelta(hours=3)
     
-    # Get distinct device IDs that have posted data in the last 3 hours
-    online_device_ids = db.session.query(DeviceData.deviceID).filter(
-        DeviceData.created_at >= three_hours_ago
-    ).distinct().all()
+    # Get device data from the last 3 hours
+    recent_device_data = db.query(DeviceData).filter(lambda doc: doc.created_at >= three_hours_ago).all()
     
-    # Convert the result to a list of IDs
-    online_device_ids = [device_id[0] for device_id in online_device_ids]
+    # Get distinct device IDs that have posted data in the last 3 hours
+    online_device_ids = list(set([data.deviceID for data in recent_device_data]))
     
     # Count the number of online devices
     online_devices = len(online_device_ids)
@@ -58,10 +56,14 @@ def dashboard_summary():
     for hour in range(24):
         start_time = datetime.now().replace(hour=hour, minute=0, second=0, microsecond=0)
         end_time = start_time + timedelta(hours=1)
-        devices_posted = db.session.query(DeviceData.deviceID).filter(
-            DeviceData.created_at >= start_time,
-            DeviceData.created_at < end_time
-        ).distinct().count()
+        
+        # Get device data for this hour
+        hour_device_data = db.query(DeviceData).filter(
+            lambda doc: doc.created_at >= start_time and doc.created_at < end_time
+        ).all()
+        
+        # Count distinct devices that posted in this hour
+        devices_posted = len(set([data.deviceID for data in hour_device_data]))
         hourly_activity.append({'hour': hour, 'devices_posted': devices_posted})
 
     # Return the summary

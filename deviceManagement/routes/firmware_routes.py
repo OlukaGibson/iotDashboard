@@ -2,7 +2,7 @@ from flask import Flask, Response, request, jsonify, send_file
 import os
 import io
 from intelhex import IntelHex
-from ..extentions import db
+from ..firestore_helpers import session as db
 from ..models import Firmware, Devices
 from google.cloud import storage
 from . import device_management, clean_data, credentials
@@ -82,15 +82,15 @@ def firmware_upload():
         **changes,
     )
 
-    db.session.add(new_firmware)
-    db.session.commit()
+    db.add(new_firmware)
+    db.commit()
 
     return {'message': 'Firmware uploaded successfully!'}
 
 # Define a route to download firmware bin file
 @device_management.route('/firmware/<string:firmwareVersion>/download/firmwarebin', methods=['GET'])
 def firmware_download(firmwareVersion):
-    firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
+    firmware = db.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
 
     if firmware:
         firmware_string = firmware.firmware_string
@@ -127,7 +127,6 @@ def firmware_download(firmwareVersion):
             # response.headers.add('Content-Length', str(length))
             return response
 
-
         # No Range header: send full file
         file_data = blob.download_as_bytes()
         return Response(
@@ -147,7 +146,7 @@ def firmware_download(firmwareVersion):
 # Define a route to download firmware hex file
 @device_management.route('/firmware/<string:firmwareVersion>/download/firmwarehex', methods=['GET'])
 def firmware_download_hex(firmwareVersion):
-    firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
+    firmware = db.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
 
     if firmware:
         firmware_string = firmware.firmware_string_hex
@@ -174,7 +173,7 @@ def firmware_download_hex(firmwareVersion):
 # Define a route to download firmware bootloader file
 @device_management.route('/firmware/<string:firmwareVersion>/download/firmwarebootloader', methods=['GET'])
 def firmware_download_bootloader(firmwareVersion):
-    firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
+    firmware = db.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
 
     if firmware:
         firmware_string = firmware.firmware_string_bootloader
@@ -201,15 +200,16 @@ def firmware_download_bootloader(firmwareVersion):
 # Define a route to retrieve all firmware versions
 @device_management.route('/firmware/display', methods=['GET'])
 def get_firmwares():
-    firmwares = db.session.query(Firmware).all()
+    firmwares = db.query(Firmware).all()
     storage_client = storage.Client(credentials=credentials)
     bucket = storage_client.bucket(os.getenv('BUCKET_NAME'))
     
     firmwares_list = []
     for version in firmwares:
         # Count devices using this firmware version as their current firmware
-        current_devices_count = db.session.query(Devices).filter_by(
-            currentFirmwareVersion=version.id
+        # Since we don't have IDs in Firestore, use firmwareVersion instead
+        current_devices_count = db.query(Devices).filter_by(
+            currentFirmwareVersion=version.firmwareVersion
         ).count()
         
         # Get file sizes
@@ -253,8 +253,7 @@ def get_firmwares():
                 changes[f'change{i}'] = change_value
 
         firmwares_list.append({
-            'id': version.id,
-            'firmwareVersion': version.firmwareVersion,
+            'firmwareVersion': version.firmwareVersion,  # Changed from 'id' to 'firmwareVersion'
             'firmware_string': version.firmware_string,
             'firmware_string_hex': version.firmware_string_hex,
             'firmware_string_bootloader': version.firmware_string_bootloader,
@@ -276,7 +275,7 @@ def get_firmwares():
 # Define a route to retrieve a specific firmware version
 @device_management.route('/firmware/<string:firmwareVersion>', methods=['GET'])
 def get_firmware(firmwareVersion):
-    firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
+    firmware = db.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
     if firmware:
         firmware_dict = {
             'firmwareVersion': firmware.firmwareVersion,
@@ -287,8 +286,7 @@ def get_firmware(firmwareVersion):
             'firmware_type': firmware.firmware_type,
             'created_at': firmware.created_at,
             'updated_at': firmware.updated_at,
-            'changes': {
-            }
+            'changes': {}
         }
         for i in range(1, 11):
             if getattr(firmware, f'change{i}'):
@@ -308,10 +306,22 @@ def update_firmware_type():
         return {'message': 'Invalid input!'}, 400
 
     # Update the firmware type in the database
-    firmware = db.session.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
+    firmware = db.query(Firmware).filter_by(firmwareVersion=firmwareVersion).first()
     if firmware:
         firmware.firmware_type = firmware_type
-        db.session.commit()
+        firmware.updated_at = datetime.now()
+        
+        # Update in Firestore
+        from ..extentions import db as firestore_db
+        from datetime import datetime
+        docs = firestore_db.collection('firmware').where('firmwareVersion', '==', firmwareVersion).get()
+        if docs:
+            doc_ref = docs[0].reference
+            doc_ref.update({
+                'firmware_type': firmware_type,
+                'updated_at': datetime.now()
+            })
+        
         return {'message': 'Firmware type updated successfully!'}
     
     return {'message': 'Firmware version not found!'}, 404

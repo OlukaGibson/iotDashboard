@@ -30,7 +30,7 @@ MarkupSafe
 packaging==24.1
 platformdirs==4.2.2
 proto-plus==1.24.0
-protobuf==5.27.2
+protobuf>=3.19.5,<5.0.0
 psycopg2==2.9.10
 psycopg2-binary --only-binary :all:
 pyasn1==0.6.0
@@ -44,6 +44,8 @@ typing_extensions==4.12.2
 urllib3==2.2.2
 virtualenv==20.26.3
 Werkzeug==3.0.3
+google-cloud-firestore==2.16.0
+firebase-admin==6.5.0
 
 
 # psycopg2-binary==2.9.9
