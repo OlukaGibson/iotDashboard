@@ -297,3 +297,35 @@ class DeviceFiles(db.Model):
     def __init__(self, deviceID, file):
         self.deviceID = deviceID
         self.file = file
+
+class Organisation(db.Model):
+    __tablename__ = 'organisation'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    location = db.Column(db.String(100), default=None)
+    token = db.Column(db.String(100), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), server_onupdate=db.func.now())
+
+    def __init__(self, name, location, token):
+        self.name = name
+        self.location = location
+        self.token = token
+
+class User(db.Model):
+    __tablename__ = 'user'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+    token = db.Column(db.String(100), unique=True, nullable=False)
+    organisationID = db.Column(db.Integer, db.ForeignKey('organisation.id'), nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), server_onupdate=db.func.now())
+
+    def __init__(self, name, email, password, token, organisationID):
+        self.name = name
+        self.email = email
+        self.password = password
+        self.token = token
+        self.organisationID = organisationID
