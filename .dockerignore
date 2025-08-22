@@ -1,9 +1,37 @@
+# Git and version control
+.git
 .gitignore
-app.yaml
-__pycache__/
-env/
-__init__test.py
 .gitkeep
+
+# Development environment
 .vscode
-.DS_Store
 .env
+env/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Testing
+__init__test.py
+.pytest_cache
+.coverage
+.tox
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build and deployment - keep docker-entrypoint.sh for the build
+app.yaml
+Dockerfile*
+
+# Logs
+*.log

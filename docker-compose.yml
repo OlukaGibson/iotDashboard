@@ -1,13 +1,43 @@
+version: '3.8'
+
 services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: iot_dashboard
+      POSTGRES_USER: iot_user
+      POSTGRES_PASSWORD: iot_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iot_user -d iot_dashboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   flask_app:
     build: .
     ports:
       - "5000:5000"
-    volumes:
-      - .:/app
-    env_file:
-      - .env
     environment:
       - FLASK_APP=deviceManagement
       - FLASK_ENV=development
-    command: gunicorn -w 4 -b 0.0.0.0:5000 run:app
+      - DATABASE_URL=postgresql://iot_user:iot_password@db:5432/iot_dashboard
+      - SQLALCHEMY_TRACK_MODIFICATIONS=false
+      - RUN_MIGRATIONS=true
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Uncomment for development mode
+      # - .:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
